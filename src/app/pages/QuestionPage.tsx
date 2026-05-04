@@ -4,7 +4,7 @@ import { Users, Clock } from "lucide-react";
 import { useGame } from "../context/GameContext";
 import { questions, TOTAL_QUESTIONS } from "../data/questions";
 
-const TIMER_DURATION = 10;
+const TIMER_DURATION = 20;
 
 const ACCENT     = "#7c6ff7";
 const CARD_BG    = "rgba(240,239,245,0.04)";
@@ -24,7 +24,7 @@ const OPT_LABELS = ["A", "B", "C", "D"];
 
 export default function QuestionPage() {
   const { state, submitAnswer } = useGame();
-  const { currentQuestionIndex, questionStartTime, hasAnswered, selectedAnswer } = state;
+  const { currentQuestionIndex, questionStartTime, hasAnswered, selectedAnswer, totalQuestions } = state;
 
   const [timeLeft, setTimeLeft] = useState(TIMER_DURATION);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -94,7 +94,7 @@ export default function QuestionPage() {
           >
             <span style={{ color: TEXT_3 }}>Q</span>
             <span className="font-bold" style={{ color: TEXT_1 }}>{currentQuestionIndex + 1}</span>
-            <span style={{ color: TEXT_3 }}>/ {TOTAL_QUESTIONS}</span>
+            <span style={{ color: TEXT_3 }}>/ {totalQuestions}</span>
           </div>
 
           {/* Timer circle */}

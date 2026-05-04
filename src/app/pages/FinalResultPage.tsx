@@ -3,7 +3,6 @@ import gsap from "gsap";
 import confetti from "canvas-confetti";
 import { Trophy, Crown, Medal, Brain, RotateCcw, Star } from "lucide-react";
 import { useGame } from "../context/GameContext";
-import { TOTAL_QUESTIONS } from "../data/questions";
 
 const ACCENT     = "#7c6ff7";
 const CARD_BG    = "rgba(240,239,245,0.04)";
@@ -20,13 +19,13 @@ const RANK_STYLES = [
 
 export default function FinalResultPage() {
   const { state, leaveGame } = useGame();
-  const { players } = state;
+  const { players, totalQuestions } = state;
   const confettiFired = useRef(false);
 
   const sorted  = [...players].sort((a, b) => b.score - a.score);
   const winner  = sorted[0];
   const isWinner = winner && (winner.id === state.playerId || winner.name === state.playerName);
-  const maxScore = TOTAL_QUESTIONS * 100;
+  const maxScore = totalQuestions * 100;
 
   useEffect(() => {
     if (!confettiFired.current) {
@@ -87,7 +86,7 @@ export default function FinalResultPage() {
               const player = sorted[rankIdx];
               if (!player) return <div key={rankIdx} className="w-24" />;
               const rs = RANK_STYLES[rankIdx] ?? RANK_STYLES[2];
-              const heights = ["h-16", "h-24", "h-12"];
+              const heights = ["h-28", "h-20", "h-14"];
               const isMe = player.id === state.playerId || player.name === state.playerName;
 
               return (
@@ -230,10 +229,6 @@ export default function FinalResultPage() {
           </button>
         </div>
 
-        <p className="final-item text-center text-xs mt-5 tracking-widest uppercase"
-          style={{ color: "rgba(240,239,245,0.18)" }}>
-          AnatoPlay · {TOTAL_QUESTIONS} questões · Tronco Encefálico
-        </p>
       </div>
     </div>
   );

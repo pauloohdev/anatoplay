@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { Trophy, Crown, Medal, ChevronRight, ArrowRight } from "lucide-react";
 import { useGame } from "../context/GameContext";
-import { questions, TOTAL_QUESTIONS } from "../data/questions";
+import { questions } from "../data/questions";
 
 const ACCENT     = "#7c6ff7";
 const CARD_BG    = "rgba(240,239,245,0.04)";
@@ -19,10 +19,10 @@ const RANK_STYLES = [
 
 export default function RankingPage() {
   const { state } = useGame();
-  const { players, currentQuestionIndex } = state;
+  const { players, currentQuestionIndex, totalQuestions } = state;
 
   const sorted       = [...players].sort((a, b) => b.score - a.score);
-  const isLastQ      = currentQuestionIndex >= TOTAL_QUESTIONS - 1;
+  const isLastQ      = currentQuestionIndex >= totalQuestions - 1;
   const nextQuestion = questions[currentQuestionIndex + 1];
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export default function RankingPage() {
             Ranking Parcial
           </h2>
           <p className="text-sm" style={{ color: TEXT_2 }}>
-            Após questão {currentQuestionIndex + 1} de {TOTAL_QUESTIONS}
+            Após questão {currentQuestionIndex + 1} de {totalQuestions}
           </p>
         </div>
 

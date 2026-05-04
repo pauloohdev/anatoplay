@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { CheckCircle2, XCircle, Lightbulb, Brain } from "lucide-react";
 import { useGame } from "../context/GameContext";
-import { questions, TOTAL_QUESTIONS } from "../data/questions";
+import { questions } from "../data/questions";
 
 const CARD_BG    = "rgba(240,239,245,0.04)";
 const CARD_BORDER= "rgba(240,239,245,0.09)";
@@ -105,7 +105,6 @@ export default function AnswerPage() {
             className="text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full inline-block mb-3"
             style={{ background: "rgba(124,111,247,0.1)", color: "#a89cf7", border: "1px solid rgba(124,111,247,0.2)" }}
           >
-            Q{currentQuestionIndex + 1}/{TOTAL_QUESTIONS} · {question.structure}
           </span>
           <p className="text-sm leading-relaxed" style={{ color: TEXT_2 }}>
             {question.question}

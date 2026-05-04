@@ -12,6 +12,7 @@ import { questions, TOTAL_QUESTIONS } from "../data/questions";
 
 // ─── Scoring ──────────────────────────────────────────────────────────────────
 const SCORE_BY_ORDER = [100, 70, 50, 30, 10];
+const QUESTION_TIMER_MS = 20_000; // 20 seconds per question
 
 function generateRoomCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -51,6 +52,7 @@ export interface GameState {
   pointsEarned: number;
   players: PlayerScore[];
   answeredCount: number;
+  totalQuestions: number;  // configured per room
   error: string | null;
   isLoading: boolean;
 }
@@ -68,7 +70,7 @@ type GameAction =
   | { type: "SET_STATUS"; payload: GameStatus }
   | {
       type: "QUESTION_START";
-      payload: { questionIndex: number; startTime: number };
+      payload: { questionIndex: number; startTime: number; totalQuestions: number };
     }
   | {
       type: "ANSWER_SUBMITTED";
@@ -82,6 +84,7 @@ type GameAction =
   | { type: "UPDATE_PLAYERS"; payload: PlayerScore[] }
   | { type: "SET_ERROR"; payload: string | null }
   | { type: "SET_LOADING"; payload: boolean }
+  | { type: "SET_TOTAL_QUESTIONS"; payload: number }
   | { type: "RESET" };
 
 // ─── Broadcast event types ────────────────────────────────────────────────────
@@ -96,7 +99,7 @@ interface PendingAnswer {
 }
 
 type BroadcastEvent =
-  | { type: "QUESTION_START"; questionIndex: number; startTime: number }
+  | { type: "QUESTION_START"; questionIndex: number; startTime: number; totalQuestions: number }
   | {
       type: "PLAYER_ANSWER";
       playerId: string;
@@ -128,6 +131,7 @@ const initialState: GameState = {
   pointsEarned: 0,
   players: [],
   answeredCount: 0,
+  totalQuestions: TOTAL_QUESTIONS,
   error: null,
   isLoading: false,
 };
@@ -150,6 +154,7 @@ function reducer(state: GameState, action: GameAction): GameState {
         gameStatus: "question",
         currentQuestionIndex: action.payload.questionIndex,
         questionStartTime: action.payload.startTime,
+        totalQuestions: action.payload.totalQuestions,
         selectedAnswer: null,
         hasAnswered: false,
         isCorrect: null,
@@ -172,6 +177,8 @@ function reducer(state: GameState, action: GameAction): GameState {
       return { ...state, error: action.payload };
     case "SET_LOADING":
       return { ...state, isLoading: action.payload };
+    case "SET_TOTAL_QUESTIONS":
+      return { ...state, totalQuestions: action.payload };
     case "RESET":
       return { ...initialState };
     default:
@@ -183,7 +190,7 @@ function reducer(state: GameState, action: GameAction): GameState {
 
 interface GameContextType {
   state: GameState;
-  createRoom: (name: string) => Promise<string>;
+  createRoom: (name: string, questionCount?: number) => Promise<string>;
   joinRoom: (name: string, code: string) => Promise<void>;
   startGame: () => void;
   submitAnswer: (answerIndex: number) => Promise<void>;
@@ -215,6 +222,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const playerScoresRef = useRef<Map<string, PlayerScore>>(new Map());
   // Per-question answered counter for non-host clients
   const localAnsweredCountRef = useRef(0);
+  // Host's configured question count for this room
+  const roomTotalQuestionsRef = useRef<number>(TOTAL_QUESTIONS);
 
   const clearHostTimer = () => {
     if (hostTimerRef.current) {
@@ -306,13 +315,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             payload: {
               questionIndex: event.questionIndex,
               startTime: event.startTime,
+              totalQuestions: event.totalQuestions,
             },
           });
 
           // Host auto-advances when timer expires
           if (s.isHost) {
             const elapsed = Date.now() - event.startTime;
-            const remaining = Math.max(10_000 - elapsed, 500);
+            const remaining = Math.max(QUESTION_TIMER_MS - elapsed, 500);
             hostTimerRef.current = setTimeout(() => {
               finalizeRoundRef.current();
             }, remaining);
@@ -410,7 +420,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
               pendingAnswersRef.current = [];
               localAnsweredCountRef.current = 0;
 
-              if (nextIndex >= TOTAL_QUESTIONS) {
+              if (nextIndex >= roomTotalQuestionsRef.current) {
                 const players = Array.from(
                   playerScoresRef.current.values()
                 ).sort((a, b) => b.score - a.score);
@@ -420,6 +430,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
                   type: "QUESTION_START",
                   questionIndex: nextIndex,
                   startTime: Date.now(),
+                  totalQuestions: roomTotalQuestionsRef.current,
                 });
               }
             }, 5_000);
@@ -516,13 +527,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   // ─── Public actions ───────────────────────────────────────────────────────
 
   const createRoom = useCallback(
-    async (name: string): Promise<string> => {
+    async (name: string, questionCount: number = TOTAL_QUESTIONS): Promise<string> => {
       dispatch({ type: "SET_LOADING", payload: true });
       dispatch({ type: "SET_ERROR", payload: null });
 
       try {
         const playerId = crypto.randomUUID();
         const code = generateRoomCode();
+
+        // Store configured question count for this room
+        roomTotalQuestionsRef.current = Math.min(questionCount, TOTAL_QUESTIONS);
 
         // Initialize host score tracking
         playerScoresRef.current = new Map([
@@ -535,6 +549,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           type: "SET_IDENTITY",
           payload: { id: playerId, name, isHost: true, roomCode: code },
         });
+        dispatch({ type: "SET_TOTAL_QUESTIONS", payload: roomTotalQuestionsRef.current });
         dispatch({
           type: "UPDATE_PLAYERS",
           payload: [{ id: playerId, name, isHost: true, score: 0 }],
@@ -592,6 +607,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       type: "QUESTION_START",
       questionIndex: 0,
       startTime: Date.now(),
+      totalQuestions: roomTotalQuestionsRef.current,
     });
   }, [broadcast]);
 

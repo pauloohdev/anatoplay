@@ -399,6 +399,17 @@ export default function IdentifyStructure() {
             <span className="text-white/60 text-sm font-medium uppercase tracking-widest">
               Identifique
             </span>
+            {/* Beta badge */}
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide"
+              style={{
+                background: "rgba(245,158,11,0.15)",
+                color: "#fbbf24",
+                border: "1px solid rgba(245,158,11,0.3)",
+              }}
+            >
+              Beta
+            </span>
           </div>
           <div className="flex items-center gap-1.5">
             <Zap className="w-3.5 h-3.5 text-cyan-400" />
