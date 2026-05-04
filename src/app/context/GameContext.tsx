@@ -13,6 +13,7 @@ import { questions, TOTAL_QUESTIONS } from "../data/questions";
 // ─── Scoring ──────────────────────────────────────────────────────────────────
 const SCORE_BY_ORDER = [100, 70, 50, 30, 10];
 const QUESTION_TIMER_MS = 20_000; // 20 seconds per question
+const ANSWER_REVEAL_DURATION_MS = 12_000; // 12 seconds to read explanation
 
 function generateRoomCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -402,7 +403,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
                 (a, b) => b.score - a.score
               );
               broadcast({ type: "SHOW_RANKING", players });
-            }, 6_000);
+            }, ANSWER_REVEAL_DURATION_MS);
           }
           break;
         }
