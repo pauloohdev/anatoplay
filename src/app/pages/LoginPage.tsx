@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
 import gsap from "gsap";
-import { Brain, Users, ArrowRight, Hash, Layers, ChevronRight, Settings2 } from "lucide-react";
+import { Brain, Users, ArrowRight, Hash, Layers, ChevronRight, Settings2, ClipboardCheck } from "lucide-react";
 import { useGame } from "../context/GameContext";
 import { playClick } from "../../lib/gameAudio";
 
@@ -53,6 +53,17 @@ export default function LoginPage() {
               Anato<span style={{ color: ACCENT }}>Play</span>
             </span>
           </div>
+          <button
+            onClick={() => {
+              playClick();
+              navigate("/criterios");
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-widest transition-colors hover:opacity-95"
+            style={{ background: "rgba(124,111,247,0.12)", border: "1px solid rgba(124,111,247,0.2)", color: TEXT_2 }}
+          >
+            <ClipboardCheck className="w-3.5 h-3.5" />
+            Critérios da Atividade
+          </button>
 
         </div>
 

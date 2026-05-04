@@ -22,7 +22,7 @@ function NavigationController() {
   const location = useLocation();
 
   useEffect(() => {
-    if (location.pathname.startsWith("/mini-games")) return;
+    if (location.pathname.startsWith("/mini-games") || location.pathname.startsWith("/criterios")) return;
     const target = STATUS_TO_ROUTE[state.gameStatus] ?? "/";
     if (location.pathname !== target) {
       navigate(target, { replace: true });

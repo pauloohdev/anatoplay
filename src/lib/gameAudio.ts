@@ -12,6 +12,12 @@ let master: GainNode | null = null;
 let musicBus: GainNode | null = null;
 let sfxBus: GainNode | null = null;
 let ambientTeardown: (() => void) | null = null;
+let ambientProfile: "calm" | "gameplay" = "calm";
+let gameplayIntensity = 0.15;
+
+function clamp01(v: number) {
+  return Math.max(0, Math.min(1, v));
+}
 
 function ensureGraph() {
   if (!AC) return null;
@@ -60,8 +66,8 @@ export function stopAmbient() {
 }
 
 /**
- * Ambient bed: A minor pad + harmonic shimmer + slow arpeggio + light delay.
- * Tuned to read as “música” (melodia/harmonia), não textura tipo ruído.
+ * Lo-fi ambient bed sem ruído contínuo:
+ * progressão suave com pad filtrado + notas "chime" em pulso lento.
  */
 export function startAmbient() {
   const c = ensureGraph();
@@ -80,141 +86,121 @@ export function startAmbient() {
     }
   };
 
-  // ── Warm static tone stack (Am): raiz + quinta + terça + oitavas ───────
-  const toneLP = c.createBiquadFilter();
-  toneLP.type = "lowpass";
-  toneLP.frequency.value = 2400;
-  toneLP.Q.value = 0.35;
-  toDisconnect.push(toneLP);
+  const padLP = c.createBiquadFilter();
+  padLP.type = "lowpass";
+  padLP.frequency.value = 1650;
+  padLP.Q.value = 0.28;
+  toDisconnect.push(padLP);
 
-  const toneSum = c.createGain();
-  toneSum.gain.value = 0.42;
-  toneLP.connect(toneSum);
-  toDisconnect.push(toneSum);
+  const padMix = c.createGain();
+  padMix.gain.value = 0.34;
+  padLP.connect(padMix);
+  toDisconnect.push(padMix);
 
-  /** A2, E3, A3, C4, E4 — volumes equilibrados, triângulo suave */
-  const padChord: { f: number; g: number }[] = [
-    { f: 110.0, g: 0.07 },
-    { f: 164.81, g: 0.055 },
-    { f: 220.0, g: 0.048 },
-    { f: 261.63, g: 0.038 },
-    { f: 329.63, g: 0.03 },
-  ];
-
-  for (const { f, g: gv } of padChord) {
+  const padNotes = [146.83, 196.0, 220.0, 293.66];
+  for (const freq of padNotes) {
     const o = c.createOscillator();
     o.type = "triangle";
-    o.frequency.value = f;
+    o.frequency.value = freq;
     const g = c.createGain();
-    g.gain.value = gv;
+    g.gain.value = 0.022;
     o.connect(g);
-    g.connect(toneLP);
+    g.connect(padLP);
     o.start();
     toStop.push(o);
     toDisconnect.push(o, g);
   }
 
-  // Harmónicos discretos no grave (corpo, não “zumbido”)
-  for (const mult of [2, 3] as const) {
-    const o = c.createOscillator();
-    o.type = "sine";
-    o.frequency.value = 110 * mult;
-    const g = c.createGain();
-    g.gain.value = mult === 2 ? 0.018 : 0.01;
-    o.connect(g);
-    g.connect(toneLP);
-    o.start();
-    toStop.push(o);
-    toDisconnect.push(o, g);
-  }
+  const lfo = c.createOscillator();
+  lfo.type = "sine";
+  lfo.frequency.value = 0.09;
+  const lfoDepth = c.createGain();
+  lfoDepth.gain.value = 110;
+  lfo.connect(lfoDepth);
+  lfoDepth.connect(padLP.frequency);
+  lfo.start();
+  toStop.push(lfo);
+  toDisconnect.push(lfo, lfoDepth);
 
-  // ── Arpejo lento Am7: A3 → C4 → E4 → G4 (loop ~5.2s) ───────────────────
-  const arpLP = c.createBiquadFilter();
-  arpLP.type = "lowpass";
-  arpLP.frequency.value = 5200;
-  arpLP.Q.value = 0.45;
-  toDisconnect.push(arpLP);
-
-  const arpMix = c.createGain();
-  arpMix.gain.value = 0.55;
-  arpLP.connect(arpMix);
-  toDisconnect.push(arpMix);
-
-  const arpNotes = [220.0, 261.63, 329.63, 392.0];
-  const arpGains: GainNode[] = [];
-  for (const f of arpNotes) {
-    const o = c.createOscillator();
-    o.type = "sine";
-    o.frequency.value = f;
-    const g = c.createGain();
-    g.gain.value = 0;
-    o.connect(g);
-    g.connect(arpLP);
-    o.start();
-    arpGains.push(g);
-    toStop.push(o);
-    toDisconnect.push(o, g);
-  }
-
-  const arpMs = 1380;
-  let arpStep = 0;
-  const arpId = window.setInterval(() => {
+  // Sequência lo-fi: Dm7 -> G7 -> Cmaj7 -> Am7
+  const chordSteps = [
+    [146.83, 220.0, 261.63, 293.66],
+    [196.0, 246.94, 293.66, 392.0],
+    [130.81, 196.0, 246.94, 329.63],
+    [110.0, 164.81, 220.0, 261.63],
+  ];
+  let chordStep = 0;
+  const chordMs = 4200;
+  const chordId = window.setInterval(() => {
     if (c.state === "closed") return;
+    const notes = chordSteps[chordStep % chordSteps.length];
     const t = c.currentTime + 0.03;
-    const idx = arpStep % arpGains.length;
-    const g = arpGains[idx];
-    try {
-      g.gain.cancelScheduledValues(t);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.linearRampToValueAtTime(0.072, t + 0.06);
-      g.gain.exponentialRampToValueAtTime(0.0006, t + 1.05);
-    } catch {
-      /* noop */
+    for (let i = 0; i < padNotes.length; i += 1) {
+      padNotes[i] = notes[i];
     }
-    arpStep += 1;
-  }, arpMs);
+    chordStep += 1;
+    // glide para evitar cliques
+    for (let i = 0; i < padNotes.length; i += 1) {
+      const osc = toStop[i];
+      osc.frequency.cancelScheduledValues(t);
+      osc.frequency.linearRampToValueAtTime(padNotes[i], t + 0.45);
+    }
+  }, chordMs);
 
-  // ── Delay paralelo (espaço / “sala”) — feedback baixo para não embaciar ─
-  const maxDelay = 2.2;
-  const delay = c.createDelay(maxDelay);
-  delay.delayTime.value = 0.56;
-  toDisconnect.push(delay);
+  const chimeBus = c.createGain();
+  chimeBus.gain.value = 0.5;
+  toDisconnect.push(chimeBus);
 
+  const chimeBP = c.createBiquadFilter();
+  chimeBP.type = "bandpass";
+  chimeBP.frequency.value = 1400;
+  chimeBP.Q.value = 0.8;
+  chimeBus.connect(chimeBP);
+  toDisconnect.push(chimeBP);
+
+  const chimeNotes = [293.66, 329.63, 392.0, 440.0, 493.88];
+  let chimeStep = 0;
+  const chimeId = window.setInterval(() => {
+    const t = c.currentTime + 0.02;
+    const o = c.createOscillator();
+    o.type = "sine";
+    o.frequency.value = chimeNotes[chimeStep % chimeNotes.length];
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.032, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + 0.7);
+    o.connect(g);
+    g.connect(chimeBus);
+    o.start(t);
+    o.stop(t + 0.8);
+    toDisconnect.push(o, g);
+    chimeStep += 1;
+  }, 1650);
+
+  const delay = c.createDelay(2.0);
+  delay.delayTime.value = 0.42;
   const fb = c.createGain();
-  fb.gain.value = 0.24;
-  toDisconnect.push(fb);
-
+  fb.gain.value = 0.2;
   const dry = c.createGain();
-  dry.gain.value = 0.74;
+  dry.gain.value = 0.8;
   const wet = c.createGain();
-  wet.gain.value = 0.36;
-  toDisconnect.push(dry, wet);
+  wet.gain.value = 0.22;
+  toDisconnect.push(delay, fb, dry, wet);
 
-  const dryPan = c.createStereoPanner();
-  dryPan.pan.value = -0.1;
-  const wetPan = c.createStereoPanner();
-  wetPan.pan.value = 0.12;
-  toDisconnect.push(dryPan, wetPan);
-
-  const busIn = c.createGain();
-  busIn.gain.value = 1;
-  toneSum.connect(busIn);
-  arpMix.connect(busIn);
-  toDisconnect.push(busIn);
-
-  busIn.connect(dry);
-  busIn.connect(delay);
+  padMix.connect(dry);
+  chimeBP.connect(dry);
+  padMix.connect(delay);
+  chimeBP.connect(delay);
   delay.connect(wet);
   delay.connect(fb);
   fb.connect(delay);
 
-  dry.connect(dryPan);
-  wet.connect(wetPan);
-  dryPan.connect(musicBus);
-  wetPan.connect(musicBus);
+  dry.connect(musicBus);
+  wet.connect(musicBus);
 
   ambientTeardown = () => {
-    window.clearInterval(arpId);
+    window.clearInterval(chordId);
+    window.clearInterval(chimeId);
     for (const o of toStop) {
       try {
         o.stop();
@@ -224,6 +210,222 @@ export function startAmbient() {
     }
     disconnectAll();
   };
+}
+
+function startGameplayAmbientInternal() {
+  const c = ensureGraph();
+  if (!c || !musicBus || ambientTeardown) return;
+
+  const toStop: OscillatorNode[] = [];
+  const toDisconnect: AudioNode[] = [];
+
+  const disconnectAll = () => {
+    for (const n of toDisconnect) {
+      try {
+        n.disconnect();
+      } catch {
+        /* noop */
+      }
+    }
+  };
+
+  const hp = c.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 120;
+  hp.Q.value = 0.4;
+  toDisconnect.push(hp);
+
+  const lp = c.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 2600;
+  lp.Q.value = 0.45;
+  hp.connect(lp);
+  toDisconnect.push(lp);
+
+  const baseMix = c.createGain();
+  baseMix.gain.value = 0.24;
+  lp.connect(baseMix);
+  toDisconnect.push(baseMix);
+
+  const o1 = c.createOscillator();
+  o1.type = "triangle";
+  o1.frequency.value = 110;
+  const g1 = c.createGain();
+  g1.gain.value = 0.03;
+  o1.connect(g1);
+  g1.connect(hp);
+  o1.start();
+
+  const o2 = c.createOscillator();
+  o2.type = "sawtooth";
+  o2.frequency.value = 220;
+  const g2 = c.createGain();
+  g2.gain.value = 0.012;
+  o2.connect(g2);
+  g2.connect(hp);
+  o2.start();
+
+  toStop.push(o1, o2);
+  toDisconnect.push(o1, g1, o2, g2);
+
+  const pulse = c.createGain();
+  pulse.gain.value = 0.0001;
+  toDisconnect.push(pulse);
+
+  const pulseOsc = c.createOscillator();
+  pulseOsc.type = "square";
+  pulseOsc.frequency.value = 440;
+  pulseOsc.connect(pulse);
+  pulse.connect(hp);
+  pulseOsc.start();
+  toStop.push(pulseOsc);
+  toDisconnect.push(pulseOsc);
+
+  const leadNotes = [293.66, 329.63, 392, 440, 392, 329.63];
+  let leadStep = 0;
+  let leadMs = 300;
+  const runLead = () => {
+    const t = c.currentTime + 0.02;
+    const freq = leadNotes[leadStep % leadNotes.length];
+    const intensity = gameplayIntensity;
+    pulseOsc.frequency.cancelScheduledValues(t);
+    pulseOsc.frequency.setValueAtTime(freq * (1 + intensity * 0.08), t);
+    pulse.gain.cancelScheduledValues(t);
+    pulse.gain.setValueAtTime(0.0001, t);
+    pulse.gain.linearRampToValueAtTime(0.028 + intensity * 0.034, t + 0.012);
+    pulse.gain.exponentialRampToValueAtTime(0.0008, t + 0.17 - intensity * 0.04);
+    leadStep += 1;
+  };
+  const leadTick = () => {
+    runLead();
+    const intensity = gameplayIntensity;
+    const next = Math.max(170, 300 - intensity * 110);
+    if (Math.abs(next - leadMs) > 8) {
+      leadMs = next;
+      window.clearInterval(leadId);
+      leadId = window.setInterval(leadTick, leadMs);
+    }
+  };
+  let leadId = window.setInterval(leadTick, leadMs);
+
+  const sideId = window.setInterval(() => {
+    const t = c.currentTime + 0.01;
+    const intensity = gameplayIntensity;
+    const low = 0.2 + intensity * 0.14;
+    const high = 0.25 + intensity * 0.25;
+    baseMix.gain.cancelScheduledValues(t);
+    baseMix.gain.setValueAtTime(low, t);
+    baseMix.gain.linearRampToValueAtTime(high, t + (0.13 - intensity * 0.05));
+  }, 600);
+
+  // Camada "metal": serra distorcida e riffs curtos no fim da partida.
+  const metalOsc = c.createOscillator();
+  metalOsc.type = "sawtooth";
+  metalOsc.frequency.value = 110;
+  const metalGain = c.createGain();
+  metalGain.gain.value = 0.0001;
+  const shaper = c.createWaveShaper();
+  const curve = new Float32Array(256);
+  for (let i = 0; i < 256; i += 1) {
+    const x = (i / 255) * 2 - 1;
+    curve[i] = Math.tanh(3.2 * x);
+  }
+  shaper.curve = curve;
+  shaper.oversample = "2x";
+  const metalLP = c.createBiquadFilter();
+  metalLP.type = "lowpass";
+  metalLP.frequency.value = 1600;
+
+  metalOsc.connect(metalGain);
+  metalGain.connect(shaper);
+  shaper.connect(metalLP);
+  metalLP.connect(baseMix);
+  metalOsc.start();
+  toStop.push(metalOsc);
+  toDisconnect.push(metalOsc, metalGain, shaper, metalLP);
+
+  const metalPattern = [82.41, 98.0, 110.0, 130.81];
+  let metalStep = 0;
+  const metalId = window.setInterval(() => {
+    const intensity = gameplayIntensity;
+    if (intensity < 0.58) return;
+    const t = c.currentTime + 0.015;
+    const f = metalPattern[metalStep % metalPattern.length];
+    metalOsc.frequency.cancelScheduledValues(t);
+    metalOsc.frequency.setValueAtTime(f * (1 + intensity * 0.12), t);
+    metalGain.gain.cancelScheduledValues(t);
+    metalGain.gain.setValueAtTime(0.0001, t);
+    metalGain.gain.linearRampToValueAtTime(0.018 + (intensity - 0.58) * 0.045, t + 0.01);
+    metalGain.gain.exponentialRampToValueAtTime(0.0009, t + 0.11);
+    metalLP.frequency.setValueAtTime(1200 + intensity * 1200, t);
+    metalStep += 1;
+  }, 240);
+
+  // Drops progressivos: pausa curta + volta forte conforme intensidade.
+  let dropCount = 0;
+  const dropId = window.setInterval(() => {
+    const intensity = gameplayIntensity;
+    if (intensity < 0.35) return;
+    dropCount += 1;
+    const t = c.currentTime + 0.03;
+    const dropWindow = 0.07 + intensity * 0.09;
+    if (dropCount % 4 !== 0) return;
+    baseMix.gain.cancelScheduledValues(t);
+    baseMix.gain.setValueAtTime(0.0001, t);
+    baseMix.gain.linearRampToValueAtTime(0.24 + intensity * 0.32, t + dropWindow);
+    pulse.gain.cancelScheduledValues(t);
+    pulse.gain.setValueAtTime(0.0001, t);
+    pulse.gain.linearRampToValueAtTime(0.04 + intensity * 0.06, t + dropWindow);
+  }, 600);
+
+  const delay = c.createDelay(1.2);
+  delay.delayTime.value = 0.24;
+  const fb = c.createGain();
+  fb.gain.value = 0.14;
+  const dry = c.createGain();
+  dry.gain.value = 0.86;
+  const wet = c.createGain();
+  wet.gain.value = 0.18;
+  toDisconnect.push(delay, fb, dry, wet);
+
+  baseMix.connect(dry);
+  baseMix.connect(delay);
+  delay.connect(wet);
+  delay.connect(fb);
+  fb.connect(delay);
+
+  dry.connect(musicBus);
+  wet.connect(musicBus);
+
+  ambientTeardown = () => {
+    window.clearInterval(leadId);
+    window.clearInterval(sideId);
+    window.clearInterval(metalId);
+    window.clearInterval(dropId);
+    for (const o of toStop) {
+      try {
+        o.stop();
+      } catch {
+        /* noop */
+      }
+    }
+    disconnectAll();
+  };
+}
+
+export function setAmbientProfile(profile: "calm" | "gameplay") {
+  if (ambientProfile === profile && isAmbientPlaying()) return;
+  ambientProfile = profile;
+  stopAmbient();
+  if (profile === "gameplay") {
+    startGameplayAmbientInternal();
+    return;
+  }
+  startAmbient();
+}
+
+export function setGameplayIntensity(progress: number) {
+  gameplayIntensity = clamp01(progress);
 }
 
 function connectSfx(node: AudioNode) {

@@ -14,6 +14,8 @@ import {
   startAmbient,
   stopAmbient,
   isAmbientPlaying,
+  setAmbientProfile,
+  setGameplayIntensity,
   playWhoosh,
   playRankingSting,
   playVictory,
@@ -52,6 +54,17 @@ export function GameAudioSync() {
     if (prev !== "ranking" && next === "ranking") playRankingSting();
     if (prev !== "finished" && next === "finished") playVictory();
   }, [state.gameStatus]);
+
+  useEffect(() => {
+    const gameplayStatuses = new Set(["question", "answer", "ranking"]);
+    setAmbientProfile(gameplayStatuses.has(state.gameStatus) ? "gameplay" : "calm");
+  }, [state.gameStatus]);
+
+  useEffect(() => {
+    const total = Math.max(1, state.totalQuestions - 1);
+    const progress = state.currentQuestionIndex / total;
+    setGameplayIntensity(progress);
+  }, [state.currentQuestionIndex, state.totalQuestions]);
 
   return null;
 }
