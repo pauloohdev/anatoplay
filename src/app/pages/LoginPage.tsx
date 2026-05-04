@@ -279,6 +279,10 @@ export default function LoginPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold" style={{ color: TEXT_1 }}>Flashcards</p>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide"
+                  style={{ background: "rgba(245,158,11,0.15)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.25)" }}>
+                  Beta
+                </span>
               <p className="text-xs mt-0.5" style={{ color: TEXT_3 }}>ordem aleatória · revisão</p>
             </div>
             <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 transition-transform group-hover:translate-x-0.5"
@@ -294,6 +298,10 @@ export default function LoginPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold" style={{ color: TEXT_1 }}>Card Battle</p>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide"
+                  style={{ background: "rgba(245,158,11,0.15)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.25)" }}>
+                  Beta
+                </span>
               <p className="text-xs mt-0.5" style={{ color: TEXT_3 }}>duelo simples vs bot</p>
             </div>
             <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 transition-transform group-hover:translate-x-0.5"
