@@ -50,7 +50,7 @@ export default function LoginPage() {
               <Brain className="w-6 h-6 text-white" />
             </div>
             <span className="text-3xl font-bold tracking-tight" style={{ color: TEXT_1 }}>
-              Anato<span style={{ color: ACCENT }}>Play</span>
+              Neuro<span style={{ color: ACCENT }}>Versus</span>
             </span>
           </div>
           <button
