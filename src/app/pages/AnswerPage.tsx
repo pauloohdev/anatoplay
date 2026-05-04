@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
-import { Lightbulb, Pause, Play, Home } from "lucide-react";
+import { Lightbulb, Pause, Play, Home, Brain } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useGame } from "../context/GameContext";
 import { questions } from "../data/questions";
