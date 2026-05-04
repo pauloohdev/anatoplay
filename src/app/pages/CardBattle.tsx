@@ -4,18 +4,15 @@ import { ArrowLeft, Swords, Shield, Sparkles, RotateCcw, Pill } from "lucide-rea
 import { BATTLE_CARDS, type BattleCard } from "../data/mini-games";
 import { playClick, playCorrect, playWrong, playVictory } from "../../lib/gameAudio";
 
-function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
 type DebuffKey = "aphasia" | "ataxia" | "neglect" | "brainFog";
 type Debuff = { key: DebuffKey; label: string; turns: number };
 type ItemCard = { id: string; name: string; blurb: string; heal?: number; shield?: number; cleanse?: boolean };
 
-const ITEM_CARDS: ItemCard[] = [
-  { id: "item-thiamine", name: "Tiamina Turbo", blurb: "Limpa debuffs e melhora o foco.", cleanse: true },
-  { id: "item-cafe", name: "Café do Plantão", blurb: "Recupera 8 HP.", heal: 8 },
+const ITEM_POOL: ItemCard[] = [
+  { id: "item-thiamine", name: "Tiamina Turbo", blurb: "Limpa debuffs.", cleanse: true },
+  { id: "item-cafe", name: "Café do Plantão", blurb: "Recupera 8 HP e +1 energia.", heal: 8, energy: 1 },
   { id: "item-helmet", name: "Capacete de Sinapse", blurb: "Gera 10 de escudo.", shield: 10 },
+  { id: "item-adrenal", name: "Adrenalina", blurb: "Próximo ataque ganha +5 dano.", dmgBoost: 5 },
 ];
 
 const ATTACK_FLAVOR: Record<string, string> = {
@@ -36,12 +33,14 @@ const LESION_BY_CARD: Record<string, Debuff> = {
   "bc-occipital": { key: "neglect", label: "Escotoma Dramático", turns: 2 },
 };
 
-function tickDebuffs(debuffs: Debuff[]) {
-  return debuffs.map((d) => ({ ...d, turns: d.turns - 1 })).filter((d) => d.turns > 0);
-}
+const CARD_COST: Record<string, number> = { "bc-frontal": 1, "bc-temporal": 3, "bc-cerebelo": 2, "bc-brainstem": 2, "bc-parietal": 1, "bc-occipital": 2 };
 
-function computeDamage(card: BattleCard, debuffs: Debuff[]): number {
-  let damage = card.power + (Math.floor(Math.random() * 9) - 4);
+function pickRandom<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
+function tickDebuffs(debuffs: Debuff[]) { return debuffs.map((d) => ({ ...d, turns: d.turns - 1 })).filter((d) => d.turns > 0); }
+function clamp(n: number, min: number, max: number) { return Math.min(max, Math.max(min, n)); }
+
+function computeDamage(card: BattleCard, debuffs: Debuff[], combo: number, bonus = 0): number {
+  let damage = card.power + (Math.floor(Math.random() * 7) - 3) + Math.min(6, combo * 2) + bonus;
   let failChance = 0;
   for (const d of debuffs) {
     if (d.key === "brainFog") damage -= 4;
@@ -50,7 +49,7 @@ function computeDamage(card: BattleCard, debuffs: Debuff[]): number {
     if (d.key === "neglect") failChance += 0.15;
   }
   if (Math.random() < failChance) return 0;
-  return Math.max(4, damage);
+  return Math.max(3, damage);
 }
 
 export default function CardBattle() {
@@ -69,7 +68,6 @@ export default function CardBattle() {
 
   const hand = useMemo(() => BATTLE_CARDS.slice(0, 4), []);
   const botDeck = useMemo(() => BATTLE_CARDS.slice(2), []);
-  const selectedCard = hand.find((c) => c.id === selectedCardId) ?? null;
 
   const pushHistory = (entry: string) => setHistory((h) => [entry, ...h].slice(0, 6));
 
