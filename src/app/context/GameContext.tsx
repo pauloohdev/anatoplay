@@ -396,7 +396,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
           dispatch({ type: "SET_STATUS", payload: "answer" });
 
-          // Host: after 6s → broadcast rankings
+          // Host: after answer reveal delay → broadcast rankings
           if (s.isHost) {
             hostTimerRef.current = setTimeout(() => {
               const players = Array.from(playerScoresRef.current.values()).sort(
