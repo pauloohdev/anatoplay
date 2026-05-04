@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { Copy, Check, Users, Crown, LogOut, Play, Wifi } from "lucide-react";
 import { useGame } from "../context/GameContext";
+import { playClick, playGameStart } from "../../lib/gameAudio";
 
 const ACCENT = "#7c6ff7";
 const CARD_BG = "rgba(240,239,245,0.04)";
@@ -35,6 +36,7 @@ export default function LobbyPage() {
   }, []);
 
   const copyCode = () => {
+    playClick();
     navigator.clipboard.writeText(state.roomCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -182,7 +184,10 @@ export default function LobbyPage() {
 
           {state.isHost ? (
             <button
-              onClick={startGame}
+              onClick={() => {
+                playGameStart();
+                startGame();
+              }}
               disabled={state.players.length < 1}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 px-6 rounded-xl font-bold text-white text-sm transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.98]"
               style={{ background: ACCENT }}

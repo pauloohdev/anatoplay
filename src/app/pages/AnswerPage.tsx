@@ -1,8 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { CheckCircle2, XCircle, Lightbulb, Brain } from "lucide-react";
 import { useGame } from "../context/GameContext";
 import { questions } from "../data/questions";
+import { playCorrect, playWrong } from "../../lib/gameAudio";
 
 const CARD_BG    = "rgba(240,239,245,0.04)";
 const CARD_BORDER= "rgba(240,239,245,0.09)";
@@ -16,6 +17,23 @@ export default function AnswerPage() {
   const { state } = useGame();
   const { currentQuestionIndex, selectedAnswer, isCorrect, pointsEarned } = state;
   const question = questions[currentQuestionIndex];
+
+  const [resultFlash, setResultFlash] = useState<string | null>(null);
+  const resultSoundKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (isCorrect === null) return;
+    const key = `${currentQuestionIndex}-${String(isCorrect)}`;
+    if (resultSoundKey.current === key) return;
+    resultSoundKey.current = key;
+    if (isCorrect) playCorrect();
+    else playWrong();
+    setResultFlash(
+      isCorrect ? "rgba(16,185,129,0.22)" : "rgba(248,113,113,0.18)"
+    );
+    const t = window.setTimeout(() => setResultFlash(null), 480);
+    return () => window.clearTimeout(t);
+  }, [isCorrect, currentQuestionIndex]);
 
   useEffect(() => {
     gsap.from(".ans-item", {
@@ -54,8 +72,18 @@ export default function AnswerPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-xl">
+    <div className="min-h-screen flex items-center justify-center p-4 relative">
+      {resultFlash && (
+        <div
+          className="pointer-events-none fixed inset-0 z-[5]"
+          style={{
+            background: `radial-gradient(ellipse 85% 55% at 50% 38%, ${resultFlash}, transparent 72%)`,
+            animation: "resultFlashFade 0.55s ease-out forwards",
+          }}
+          aria-hidden
+        />
+      )}
+      <div className="w-full max-w-xl relative z-10">
 
         {/* ── Result badge ────────────────────────────────────────────────── */}
         <div className="ans-item text-center mb-5">
@@ -198,6 +226,11 @@ export default function AnswerPage() {
         @keyframes dotBounce {
           0%, 100% { transform: translateY(0); opacity: 0.4; }
           50%       { transform: translateY(-4px); opacity: 1; }
+        }
+        @keyframes resultFlashFade {
+          0%   { opacity: 0; }
+          18%  { opacity: 1; }
+          100% { opacity: 0; }
         }
       `}</style>
     </div>

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import gsap from "gsap";
 import { Users, Clock } from "lucide-react";
 import { useGame } from "../context/GameContext";
-import { questions, TOTAL_QUESTIONS } from "../data/questions";
+import { questions } from "../data/questions";
+import { playClick, playTick } from "../../lib/gameAudio";
 
 const TIMER_DURATION = 20;
 
@@ -28,8 +29,12 @@ export default function QuestionPage() {
 
   const [timeLeft, setTimeLeft] = useState(TIMER_DURATION);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastTickSecondRef = useRef<number | null>(null);
 
   const question = questions[currentQuestionIndex];
+
+  const hasAnsweredRef = useRef(hasAnswered);
+  hasAnsweredRef.current = hasAnswered;
 
   // Sync timer to broadcast startTime
   useEffect(() => {
@@ -41,9 +46,15 @@ export default function QuestionPage() {
     };
 
     setTimeLeft(Math.ceil(calc()));
+    lastTickSecondRef.current = null;
     timerRef.current = setInterval(() => {
       const rem = calc();
-      setTimeLeft(Math.ceil(rem));
+      const ceil = Math.ceil(rem);
+      setTimeLeft(ceil);
+      if (!hasAnsweredRef.current && ceil >= 1 && ceil <= 3 && lastTickSecondRef.current !== ceil) {
+        lastTickSecondRef.current = ceil;
+        playTick();
+      }
       if (rem <= 0) clearInterval(timerRef.current!);
     }, 200);
 
@@ -63,6 +74,7 @@ export default function QuestionPage() {
 
   const handleAnswer = useCallback((index: number) => {
     if (hasAnswered || timeLeft <= 0) return;
+    playClick();
     submitAnswer(index);
   }, [hasAnswered, timeLeft, submitAnswer]);
 

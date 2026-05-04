@@ -4,6 +4,7 @@ import { CustomCursor } from "./CustomCursor";
 import { GrainOverlay } from "./GrainOverlay";
 import { useGame } from "../context/GameContext";
 import { GameProvider } from "../context/GameContext";
+import { GameAudioProvider, GameAudioSync } from "../context/GameAudioContext";
 
 // Maps game status to route
 const STATUS_TO_ROUTE: Record<string, string> = {
@@ -35,7 +36,9 @@ function NavigationController() {
 export function Layout() {
   return (
     <GameProvider>
-      <LayoutInner />
+      <GameAudioProvider>
+        <LayoutInner />
+      </GameAudioProvider>
     </GameProvider>
   );
 }
@@ -57,6 +60,7 @@ function LayoutInner() {
 
       <GrainOverlay />
       <CustomCursor />
+      <GameAudioSync />
       <NavigationController />
 
       <div className="relative z-10 min-h-screen">
