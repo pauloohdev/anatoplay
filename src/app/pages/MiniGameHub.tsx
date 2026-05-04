@@ -2,6 +2,7 @@ import { useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
 import gsap from "gsap";
 import { Brain, Layers, ArrowLeft, Target, ChevronRight } from "lucide-react";
+import { playClick } from "../../lib/gameAudio";
 
 interface MiniGameCardProps {
   title: string;
@@ -44,7 +45,10 @@ function MiniGameCard({
   return (
     <div
       ref={ref}
-      onClick={onClick}
+      onClick={() => {
+        playClick();
+        onClick();
+      }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       className="hub-card cursor-pointer rounded-2xl p-6 flex flex-col gap-4 group transition-all duration-300"
@@ -167,7 +171,10 @@ export default function MiniGameHub() {
         {/* Header */}
         <div className="hub-header mb-10">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => {
+              playClick();
+              navigate("/");
+            }}
             className="flex items-center gap-2 text-sm transition-colors mb-6 hover:opacity-100"
             style={{ color: "rgba(240,239,245,0.4)" }}
           >

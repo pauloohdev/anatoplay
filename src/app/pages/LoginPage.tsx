@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import gsap from "gsap";
 import { Brain, Users, ArrowRight, Hash, Layers, ChevronRight, Settings2 } from "lucide-react";
 import { useGame } from "../context/GameContext";
+import { playClick } from "../../lib/gameAudio";
 
 const ACCENT      = "#7c6ff7";
 const CARD_BG     = "rgba(240,239,245,0.04)";
@@ -222,7 +223,7 @@ export default function LoginPage() {
 
         {/* ── Mini-games ───────────────────────────────────────────────── */}
         <div className="reveal-item grid grid-cols-2 gap-3">
-          <button onClick={() => navigate("/mini-games/identify")}
+          <button onClick={() => { playClick(); navigate("/mini-games/identify"); }}
             className="group flex items-center gap-3 p-4 rounded-xl text-left transition-all duration-200 hover:scale-[1.01]"
             style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}>
             <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -243,7 +244,7 @@ export default function LoginPage() {
               style={{ color: TEXT_3 }} />
           </button>
 
-          <button onClick={() => navigate("/mini-games/match")}
+          <button onClick={() => { playClick(); navigate("/mini-games/match"); }}
             className="group flex items-center gap-3 p-4 rounded-xl text-left transition-all duration-200 hover:scale-[1.01]"
             style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}>
             <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"

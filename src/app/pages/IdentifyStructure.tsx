@@ -7,6 +7,14 @@ import {
   IDENTIFY_QUESTIONS,
   type IdentifyQuestion,
 } from "../data/mini-games";
+import {
+  playClick,
+  playCorrect,
+  playWrong,
+  playTick,
+  playWhoosh,
+  playVictory,
+} from "../../lib/gameAudio";
 
 // ─── Brain SVG Diagram ────────────────────────────────────────────────────────
 
@@ -277,14 +285,20 @@ function ResultScreen({
 
       <div className="flex gap-3 w-full">
         <button
-          onClick={onBack}
+          onClick={() => {
+            playClick();
+            onBack();
+          }}
           className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white/60 text-sm font-medium transition-all hover:text-white"
           style={{ border: "1px solid rgba(255,255,255,0.1)" }}
         >
           <ArrowLeft className="w-4 h-4" /> Voltar
         </button>
         <button
-          onClick={onRestart}
+          onClick={() => {
+            playClick();
+            onRestart();
+          }}
           className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white transition-all"
           style={{ background: "linear-gradient(135deg, #22d3ee, #8b5cf6)" }}
         >
@@ -319,8 +333,22 @@ export default function IdentifyStructure() {
   const [phase, setPhase] = useState<"playing" | "feedback" | "complete">("playing");
   const [results, setResults] = useState<boolean[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastTimerTickRef = useRef<number | null>(null);
 
   const q = questions[currentQ];
+
+  useEffect(() => {
+    lastTimerTickRef.current = null;
+  }, [currentQ]);
+
+  // Últimos 3s do timer
+  useEffect(() => {
+    if (phase !== "playing") return;
+    if (timeLeft < 1 || timeLeft > 3) return;
+    if (lastTimerTickRef.current === timeLeft) return;
+    lastTimerTickRef.current = timeLeft;
+    playTick();
+  }, [timeLeft, phase]);
 
   // Timer countdown
   useEffect(() => {
@@ -350,7 +378,10 @@ export default function IdentifyStructure() {
   const handleAnswer = useCallback(
     (idx: number) => {
       if (phase !== "playing") return;
+      if (idx >= 0) playClick();
       const correct = idx === q.correctIndex;
+      if (correct) playCorrect();
+      else playWrong();
       const bonus = correct ? Math.round(timeLeft * 6) : 0;
       const pts = correct ? 50 + bonus : 0;
       setSelected(idx);
@@ -361,8 +392,10 @@ export default function IdentifyStructure() {
       setTimeout(() => {
         const nextQ = currentQ + 1;
         if (nextQ >= questions.length) {
+          playVictory();
           setPhase("complete");
         } else {
+          playWhoosh();
           setCurrentQ(nextQ);
           setSelected(null);
           setTimeLeft(TIMER_MAX);
@@ -374,6 +407,7 @@ export default function IdentifyStructure() {
   );
 
   const restart = () => {
+    playClick();
     setCurrentQ(0);
     setScore(0);
     setTimeLeft(TIMER_MAX);
@@ -388,7 +422,10 @@ export default function IdentifyStructure() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6 q-item">
           <button
-            onClick={() => navigate("/mini-games")}
+            onClick={() => {
+              playClick();
+              navigate("/mini-games");
+            }}
             className="flex items-center gap-2 text-white/40 hover:text-white text-sm transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />

@@ -11,6 +11,7 @@ import {
   Zap,
 } from "lucide-react";
 import { MATCH_PAIRS_SET_A, MATCH_PAIRS_SET_B, type MatchPair } from "../data/mini-games";
+import { playClick, playCorrect, playWrong, playVictory } from "../../lib/gameAudio";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -231,14 +232,20 @@ function ResultScreen({
       </div>
       <div className="flex gap-3 w-full">
         <button
-          onClick={onBack}
+          onClick={() => {
+            playClick();
+            onBack();
+          }}
           className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white/60 text-sm font-medium transition-all hover:text-white"
           style={{ border: "1px solid rgba(255,255,255,0.1)" }}
         >
           <ArrowLeft className="w-4 h-4" /> Voltar
         </button>
         <button
-          onClick={onRestart}
+          onClick={() => {
+            playClick();
+            onRestart();
+          }}
           className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white"
           style={{ background: "linear-gradient(135deg, #10b981, #22d3ee)" }}
         >
@@ -292,6 +299,7 @@ export default function WordMatch() {
       if (flipped.length >= 2) return;
 
       const newFlipped = [...flipped, uid];
+      if (newFlipped.length === 1) playClick();
       setFlipped(newFlipped);
 
       if (newFlipped.length === 2) {
@@ -300,18 +308,20 @@ export default function WordMatch() {
         const [a, b] = newFlipped.map((id) => cards.find((c) => c.uid === id)!);
 
         if (a.pairId === b.pairId && a.type !== b.type) {
-          // Match!
+          playCorrect();
           setMatched((m) => [...m, a.pairId]);
           setFlipped([]);
           setIsChecking(false);
 
-          // Check completion
           if (matched.length + 1 >= pairs.length) {
             timer.stop();
-            setTimeout(() => setPhase("complete"), 600);
+            setTimeout(() => {
+              playVictory();
+              setPhase("complete");
+            }, 600);
           }
         } else {
-          // Wrong — penalize and flip back
+          playWrong();
           setScore((s) => Math.max(50, s - 30));
           setWrongPair(newFlipped);
           setTimeout(() => {
@@ -326,6 +336,7 @@ export default function WordMatch() {
   );
 
   const restart = () => {
+    playClick();
     const newCards = buildCards(pairs);
     setCards(newCards);
     setFlipped([]);
@@ -348,7 +359,10 @@ export default function WordMatch() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <button
-            onClick={() => navigate("/mini-games")}
+            onClick={() => {
+              playClick();
+              navigate("/mini-games");
+            }}
             className="flex items-center gap-2 text-white/40 hover:text-white text-sm transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
