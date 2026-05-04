@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { ArrowLeft, Swords, Shield, Sparkles, RotateCcw, Info } from "lucide-react";
+import { ArrowLeft, Swords, Shield, Sparkles, RotateCcw, Info, Pill } from "lucide-react";
 import { BATTLE_CARDS, type BattleCard } from "../data/mini-games";
 import { playClick, playCorrect, playWrong, playVictory } from "../../lib/gameAudio";
 
@@ -8,9 +8,40 @@ function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function botAttackDamage(card: BattleCard): number {
-  const variance = Math.floor(Math.random() * 7) - 3;
-  return Math.max(6, card.power + variance);
+type DebuffKey = "aphasia" | "ataxia" | "neglect" | "brainFog";
+type Debuff = { key: DebuffKey; label: string; turns: number; };
+type ItemCard = { id: string; name: string; blurb: string; heal?: number; shield?: number; cleanse?: boolean; };
+
+const ITEM_CARDS: ItemCard[] = [
+  { id: "item-thiamine", name: "Tiamina Turbo", blurb: "Limpa debuffs e melhora o foco.", cleanse: true },
+  { id: "item-cafe", name: "Café do Plantão", blurb: "Recupera 8 HP.", heal: 8 },
+  { id: "item-helmet", name: "Capacete de Sinapse", blurb: "Gera 10 de escudo.", shield: 10 },
+];
+
+const LESION_BY_CARD: Record<string, Debuff> = {
+  "bc-frontal": { key: "brainFog", label: "Síndrome Disexecutiva", turns: 2 },
+  "bc-temporal": { key: "aphasia", label: "Afasia Satírica", turns: 2 },
+  "bc-cerebelo": { key: "ataxia", label: "Ataxia", turns: 2 },
+  "bc-brainstem": { key: "brainFog", label: "Pane de Tronco", turns: 1 },
+  "bc-parietal": { key: "neglect", label: "Negligência Hemiespacial", turns: 2 },
+  "bc-occipital": { key: "neglect", label: "Escotoma Dramático", turns: 2 },
+};
+
+function tickDebuffs(debuffs: Debuff[]) {
+  return debuffs.map((d) => ({ ...d, turns: d.turns - 1 })).filter((d) => d.turns > 0);
+}
+
+function computeDamage(card: BattleCard, debuffs: Debuff[]): number {
+  let damage = card.power + (Math.floor(Math.random() * 9) - 4);
+  let failChance = 0;
+  for (const d of debuffs) {
+    if (d.key === "brainFog") damage -= 4;
+    if (d.key === "ataxia") damage += Math.floor(Math.random() * 7) - 3;
+    if (d.key === "aphasia") failChance += 0.2;
+    if (d.key === "neglect") failChance += 0.15;
+  }
+  if (Math.random() < failChance) return 0;
+  return Math.max(4, damage);
 }
 
 export default function CardBattle() {
@@ -22,23 +53,32 @@ export default function CardBattle() {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [round, setRound] = useState(1);
   const [history, setHistory] = useState<string[]>([]);
+  const [playerDebuffs, setPlayerDebuffs] = useState<Debuff[]>([]);
+  const [botDebuffs, setBotDebuffs] = useState<Debuff[]>([]);
+  const [playerShield, setPlayerShield] = useState(0);
+  const [botShield, setBotShield] = useState(0);
 
   const hand = useMemo(() => BATTLE_CARDS.slice(0, 4), []);
   const botDeck = useMemo(() => BATTLE_CARDS.slice(2), []);
   const selectedCard = hand.find((c) => c.id === selectedCardId) ?? null;
 
   const pushHistory = (entry: string) => {
-    setHistory((h) => [entry, ...h].slice(0, 5));
+    setHistory((h) => [entry, ...h].slice(0, 7));
   };
 
   const handlePlayerAttack = () => {
     if (turn !== "player" || !selectedCard) return;
     playClick();
-    const variance = Math.floor(Math.random() * 9) - 4;
-    const damage = Math.max(7, selectedCard.power + variance);
+    const damageRaw = computeDamage(selectedCard, playerDebuffs);
+    const blocked = Math.min(botShield, damageRaw);
+    const damage = Math.max(0, damageRaw - blocked);
     const nextBotHp = Math.max(0, botHp - damage);
+    const lesion = LESION_BY_CARD[selectedCard.id];
+    setBotShield((v) => Math.max(0, v - blocked));
     setBotHp(nextBotHp);
-    const playerMsg = `Round ${round}: você usou ${selectedCard.attack} (${selectedCard.name}) e causou ${damage} de dano.`;
+    setPlayerDebuffs((d) => tickDebuffs(d));
+    setBotDebuffs((d) => [...tickDebuffs(d), lesion]);
+    const playerMsg = `Round ${round}: ${selectedCard.attack} (${selectedCard.name}) causou ${damage}${blocked ? ` (${blocked} bloqueado)` : ""} e aplicou ${lesion.label}.`;
     setLog(playerMsg);
     pushHistory(playerMsg);
     playCorrect();
@@ -52,11 +92,31 @@ export default function CardBattle() {
 
     setTurn("bot");
     window.setTimeout(() => {
+      const useItem = Math.random() < 0.3;
+      if (useItem) {
+        const item = pickRandom(ITEM_CARDS);
+        if (item.heal) setBotHp((hp) => Math.min(100, hp + item.heal));
+        if (item.shield) setBotShield((s) => s + item.shield);
+        if (item.cleanse) setBotDebuffs([]);
+        const itemMsg = `Round ${round}: bot usou item ${item.name} (${item.blurb}).`;
+        setLog(itemMsg);
+        pushHistory(itemMsg);
+        setTurn("player");
+        setRound((r) => r + 1);
+        playWrong();
+        return;
+      }
       const botCard = pickRandom(botDeck);
-      const botDamage = botAttackDamage(botCard);
+      const rawBotDamage = computeDamage(botCard, botDebuffs);
+      const blocked = Math.min(playerShield, rawBotDamage);
+      const botDamage = Math.max(0, rawBotDamage - blocked);
+      const lesion = LESION_BY_CARD[botCard.id];
+      setPlayerShield((v) => Math.max(0, v - blocked));
+      setBotDebuffs((d) => tickDebuffs(d));
+      setPlayerDebuffs((d) => [...tickDebuffs(d), lesion]);
       setPlayerHp((hp) => {
         const nextPlayerHp = Math.max(0, hp - botDamage);
-        const botMsg = `Round ${round}: bot usou ${botCard.attack} (${botCard.name}) e causou ${botDamage} de dano.`;
+        const botMsg = `Round ${round}: bot usou ${botCard.attack} (${botCard.name}) e causou ${botDamage}${blocked ? ` (${blocked} bloqueado)` : ""}. Debuff: ${lesion.label}.`;
         setLog(botMsg);
         pushHistory(botMsg);
         if (nextPlayerHp <= 0) {
@@ -73,6 +133,20 @@ export default function CardBattle() {
     }, 700);
   };
 
+  const handleUseItem = () => {
+    if (turn !== "player" || turn === "end") return;
+    playClick();
+    const item = pickRandom(ITEM_CARDS);
+    if (item.heal) setPlayerHp((hp) => Math.min(100, hp + item.heal));
+    if (item.shield) setPlayerShield((s) => s + item.shield);
+    if (item.cleanse) setPlayerDebuffs([]);
+    setPlayerDebuffs((d) => tickDebuffs(d));
+    const msg = `Round ${round}: você usou item ${item.name} (${item.blurb}).`;
+    setLog(msg);
+    pushHistory(msg);
+    setTurn("bot");
+  };
+
   const restart = () => {
     playClick();
     setPlayerHp(100);
@@ -82,6 +156,10 @@ export default function CardBattle() {
     setSelectedCardId(null);
     setRound(1);
     setHistory([]);
+    setPlayerDebuffs([]);
+    setBotDebuffs([]);
+    setPlayerShield(0);
+    setBotShield(0);
   };
 
   return (
@@ -126,7 +204,7 @@ export default function CardBattle() {
           <Info className="w-4 h-4 mt-0.5 text-violet-300 flex-shrink-0" />
           <p>
             Regras: cada turno você escolhe 1 carta e ataca. O bot responde com uma carta aleatória.
-            Vence quem zerar o HP do adversário primeiro.
+            Agora lesões geram debuffs temáticos (afasia, ataxia, negligência) e itens clínicos podem curar ou proteger.
           </p>
         </div>
 
@@ -171,6 +249,15 @@ export default function CardBattle() {
             {selectedCard ? `Atacar com ${selectedCard.attack}` : "Selecione uma carta"}
           </button>
           <button
+            onClick={handleUseItem}
+            disabled={turn !== "player" || turn === "end"}
+            className="py-2.5 px-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: "rgba(34,211,238,0.15)", border: "1px solid rgba(34,211,238,0.35)", color: "#67e8f9" }}
+          >
+            <Pill className="w-4 h-4" />
+            Usar item
+          </button>
+          <button
             onClick={restart}
             className="py-2.5 px-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
             style={{ background: "rgba(124,111,247,0.15)", border: "1px solid rgba(124,111,247,0.35)", color: "#a89cf7" }}
@@ -183,8 +270,11 @@ export default function CardBattle() {
             style={{ border: "1px solid rgba(240,239,245,0.12)", color: "rgba(240,239,245,0.5)" }}
           >
             <Shield className="w-3.5 h-3.5" />
-            {turn === "player" ? `Sua vez · Round ${round}` : turn === "bot" ? "Vez do bot" : "Partida encerrada"}
+            {turn === "player" ? `Sua vez · Round ${round}` : turn === "bot" ? "Vez do bot" : "Partida encerrada"} · Escudo {playerShield}/{botShield}
           </div>
+        </div>
+        <div className="mt-3 text-xs text-white/60">
+          Seus debuffs: {playerDebuffs.length ? playerDebuffs.map((d) => `${d.label}(${d.turns})`).join(", ") : "nenhum"}.
         </div>
 
         {history.length > 0 && (

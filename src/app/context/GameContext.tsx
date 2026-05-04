@@ -56,6 +56,7 @@ export interface GameState {
   totalQuestions: number;  // configured per room
   error: string | null;
   isLoading: boolean;
+  isPaused: boolean;
 }
 
 type GameAction =
@@ -86,6 +87,7 @@ type GameAction =
   | { type: "SET_ERROR"; payload: string | null }
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "SET_TOTAL_QUESTIONS"; payload: number }
+  | { type: "SET_PAUSED"; payload: boolean }
   | { type: "RESET" };
 
 // ─── Broadcast event types ────────────────────────────────────────────────────
@@ -114,6 +116,8 @@ type BroadcastEvent =
       results: Record<string, { isCorrect: boolean; pointsEarned: number }>;
     }
   | { type: "SHOW_RANKING"; players: PlayerScore[] }
+  | { type: "PAUSE_GAME" }
+  | { type: "RESUME_GAME" }
   | { type: "GAME_END"; players: PlayerScore[] };
 
 // ─── Reducer ─────────────────────────────────────────────────────────────────
@@ -135,6 +139,7 @@ const initialState: GameState = {
   totalQuestions: TOTAL_QUESTIONS,
   error: null,
   isLoading: false,
+  isPaused: false,
 };
 
 function reducer(state: GameState, action: GameAction): GameState {
@@ -180,6 +185,8 @@ function reducer(state: GameState, action: GameAction): GameState {
       return { ...state, isLoading: action.payload };
     case "SET_TOTAL_QUESTIONS":
       return { ...state, totalQuestions: action.payload };
+    case "SET_PAUSED":
+      return { ...state, isPaused: action.payload };
     case "RESET":
       return { ...initialState };
     default:
@@ -196,6 +203,8 @@ interface GameContextType {
   startGame: () => void;
   submitAnswer: (answerIndex: number) => Promise<void>;
   leaveGame: () => void;
+  pauseGame: () => void;
+  resumeGame: () => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -242,6 +251,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       payload: event,
     });
   }, []);
+
+  const scheduleRankingTransition = useCallback(() => {
+    clearHostTimer();
+    hostTimerRef.current = setTimeout(() => {
+      const players = Array.from(playerScoresRef.current.values()).sort(
+        (a, b) => b.score - a.score
+      );
+      broadcast({ type: "SHOW_RANKING", players });
+    }, ANSWER_REVEAL_DURATION_MS);
+  }, [broadcast]);
 
   // ─── Host: finalize round & broadcast SHOW_ANSWER ─────────────────────────
 
@@ -439,6 +458,20 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           break;
         }
 
+        case "PAUSE_GAME": {
+          clearHostTimer();
+          dispatch({ type: "SET_PAUSED", payload: true });
+          break;
+        }
+
+        case "RESUME_GAME": {
+          dispatch({ type: "SET_PAUSED", payload: false });
+          if (s.isHost && s.gameStatus === "answer") {
+            scheduleRankingTransition();
+          }
+          break;
+        }
+
         // ── Game over ───────────────────────────────────────────────────────
         case "GAME_END": {
           clearHostTimer();
@@ -448,7 +481,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [broadcast]
+    [broadcast, scheduleRankingTransition]
   );
 
   // Always-fresh ref so setupChannel never goes stale
@@ -634,8 +667,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         timestamp: Date.now(),
       });
     },
-    [broadcast]
+    [broadcast, scheduleRankingTransition]
   );
+
+  const pauseGame = useCallback(() => {
+    if (!stateRef.current.isHost) return;
+    broadcast({ type: "PAUSE_GAME" });
+  }, [broadcast]);
+
+  const resumeGame = useCallback(() => {
+    if (!stateRef.current.isHost) return;
+    broadcast({ type: "RESUME_GAME" });
+  }, [broadcast]);
 
   const leaveGame = useCallback(() => {
     clearHostTimer();
@@ -661,7 +704,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <GameContext.Provider
-      value={{ state, createRoom, joinRoom, startGame, submitAnswer, leaveGame }}
+      value={{ state, createRoom, joinRoom, startGame, submitAnswer, leaveGame, pauseGame, resumeGame }}
     >
       {children}
     </GameContext.Provider>
