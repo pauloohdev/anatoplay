@@ -1,21 +1,18 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { ArrowLeft, Swords, Shield, Sparkles, RotateCcw, Info, Pill } from "lucide-react";
+import { ArrowLeft, Swords, Shield, Sparkles, RotateCcw, Pill, Zap } from "lucide-react";
 import { BATTLE_CARDS, type BattleCard } from "../data/mini-games";
 import { playClick, playCorrect, playWrong, playVictory } from "../../lib/gameAudio";
 
-function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
 type DebuffKey = "aphasia" | "ataxia" | "neglect" | "brainFog";
-type Debuff = { key: DebuffKey; label: string; turns: number; };
-type ItemCard = { id: string; name: string; blurb: string; heal?: number; shield?: number; cleanse?: boolean; };
+type Debuff = { key: DebuffKey; label: string; turns: number };
+type ItemCard = { id: string; name: string; blurb: string; heal?: number; shield?: number; cleanse?: boolean; energy?: number; dmgBoost?: number };
 
-const ITEM_CARDS: ItemCard[] = [
-  { id: "item-thiamine", name: "Tiamina Turbo", blurb: "Limpa debuffs e melhora o foco.", cleanse: true },
-  { id: "item-cafe", name: "Café do Plantão", blurb: "Recupera 8 HP.", heal: 8 },
+const ITEM_POOL: ItemCard[] = [
+  { id: "item-thiamine", name: "Tiamina Turbo", blurb: "Limpa debuffs.", cleanse: true },
+  { id: "item-cafe", name: "Café do Plantão", blurb: "Recupera 8 HP e +1 energia.", heal: 8, energy: 1 },
   { id: "item-helmet", name: "Capacete de Sinapse", blurb: "Gera 10 de escudo.", shield: 10 },
+  { id: "item-adrenal", name: "Adrenalina", blurb: "Próximo ataque ganha +5 dano.", dmgBoost: 5 },
 ];
 
 const LESION_BY_CARD: Record<string, Debuff> = {
@@ -27,12 +24,14 @@ const LESION_BY_CARD: Record<string, Debuff> = {
   "bc-occipital": { key: "neglect", label: "Escotoma Dramático", turns: 2 },
 };
 
-function tickDebuffs(debuffs: Debuff[]) {
-  return debuffs.map((d) => ({ ...d, turns: d.turns - 1 })).filter((d) => d.turns > 0);
-}
+const CARD_COST: Record<string, number> = { "bc-frontal": 1, "bc-temporal": 3, "bc-cerebelo": 2, "bc-brainstem": 2, "bc-parietal": 1, "bc-occipital": 2 };
 
-function computeDamage(card: BattleCard, debuffs: Debuff[]): number {
-  let damage = card.power + (Math.floor(Math.random() * 9) - 4);
+function pickRandom<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
+function tickDebuffs(debuffs: Debuff[]) { return debuffs.map((d) => ({ ...d, turns: d.turns - 1 })).filter((d) => d.turns > 0); }
+function clamp(n: number, min: number, max: number) { return Math.min(max, Math.max(min, n)); }
+
+function computeDamage(card: BattleCard, debuffs: Debuff[], combo: number, bonus = 0): number {
+  let damage = card.power + (Math.floor(Math.random() * 7) - 3) + Math.min(6, combo * 2) + bonus;
   let failChance = 0;
   for (const d of debuffs) {
     if (d.key === "brainFog") damage -= 4;
@@ -41,267 +40,109 @@ function computeDamage(card: BattleCard, debuffs: Debuff[]): number {
     if (d.key === "neglect") failChance += 0.15;
   }
   if (Math.random() < failChance) return 0;
-  return Math.max(4, damage);
+  return Math.max(3, damage);
 }
 
 export default function CardBattle() {
   const navigate = useNavigate();
-  const [playerHp, setPlayerHp] = useState(100);
-  const [botHp, setBotHp] = useState(100);
-  const [turn, setTurn] = useState<"player" | "bot" | "end">("player");
-  const [log, setLog] = useState<string>("Escolha uma carta e veja o efeito neurofuncional antes de atacar.");
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
-  const [round, setRound] = useState(1);
-  const [history, setHistory] = useState<string[]>([]);
-  const [playerDebuffs, setPlayerDebuffs] = useState<Debuff[]>([]);
-  const [botDebuffs, setBotDebuffs] = useState<Debuff[]>([]);
-  const [playerShield, setPlayerShield] = useState(0);
-  const [botShield, setBotShield] = useState(0);
-
   const hand = useMemo(() => BATTLE_CARDS.slice(0, 4), []);
   const botDeck = useMemo(() => BATTLE_CARDS.slice(2), []);
-  const selectedCard = hand.find((c) => c.id === selectedCardId) ?? null;
 
-  const pushHistory = (entry: string) => {
-    setHistory((h) => [entry, ...h].slice(0, 7));
+  const [playerHp, setPlayerHp] = useState(100); const [botHp, setBotHp] = useState(100);
+  const [playerShield, setPlayerShield] = useState(0); const [botShield, setBotShield] = useState(0);
+  const [playerEnergy, setPlayerEnergy] = useState(3); const [botEnergy, setBotEnergy] = useState(3);
+  const [turn, setTurn] = useState<"player"|"bot"|"end">("player");
+  const [log, setLog] = useState("Monte sua jogada: energia, item e carta importam.");
+  const [round, setRound] = useState(1); const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [playerDebuffs, setPlayerDebuffs] = useState<Debuff[]>([]); const [botDebuffs, setBotDebuffs] = useState<Debuff[]>([]);
+  const [history, setHistory] = useState<string[]>([]); const [playerCombo, setPlayerCombo] = useState(0); const [botCombo, setBotCombo] = useState(0);
+  const [playerInventory, setPlayerInventory] = useState<ItemCard[]>([ITEM_POOL[0], ITEM_POOL[1], ITEM_POOL[3]]);
+  const [botInventory, setBotInventory] = useState<ItemCard[]>([ITEM_POOL[1], ITEM_POOL[2], ITEM_POOL[3]]);
+  const [attackBonus, setAttackBonus] = useState(0); const [botAttackBonus, setBotAttackBonus] = useState(0);
+
+  const selectedCard = hand.find((c) => c.id === selectedCardId) ?? null;
+  const pushHistory = (entry: string) => setHistory((h) => [entry, ...h].slice(0, 8));
+
+  const applyItem = (item: ItemCard, target: "player" | "bot") => {
+    const heal = item.heal ?? 0; const shield = item.shield ?? 0; const energy = item.energy ?? 0;
+    if (target === "player") {
+      if (heal) setPlayerHp((v) => clamp(v + heal, 0, 100)); if (shield) setPlayerShield((v) => v + shield); if (energy) setPlayerEnergy((v) => clamp(v + energy, 0, 6));
+      if (item.cleanse) setPlayerDebuffs([]); if (item.dmgBoost) setAttackBonus((v) => v + item.dmgBoost);
+    } else {
+      if (heal) setBotHp((v) => clamp(v + heal, 0, 100)); if (shield) setBotShield((v) => v + shield); if (energy) setBotEnergy((v) => clamp(v + energy, 0, 6));
+      if (item.cleanse) setBotDebuffs([]); if (item.dmgBoost) setBotAttackBonus((v) => v + item.dmgBoost);
+    }
   };
+
+  useEffect(() => {
+    if (turn !== "bot") return;
+    const timer = window.setTimeout(() => {
+      const botCanUseItem = botInventory.length > 0 && (botHp < 45 || botEnergy <= 1 || Math.random() < 0.2);
+      if (botCanUseItem) {
+        const item = botInventory[0];
+        applyItem(item, "bot"); setBotInventory((inv) => inv.slice(1));
+        const msg = `Round ${round}: bot usou ${item.name}.`; setLog(msg); pushHistory(`${msg} ${item.blurb}`);
+        setBotDebuffs((d) => tickDebuffs(d)); setPlayerDebuffs((d) => tickDebuffs(d));
+        setBotEnergy((e) => clamp(e + 2, 0, 6)); setPlayerEnergy((e) => clamp(e + 2, 0, 6));
+        setTurn("player"); setRound((r) => r + 1); playWrong(); return;
+      }
+
+      const playable = botDeck.filter((c) => CARD_COST[c.id] <= botEnergy);
+      const botCard = pickRandom(playable.length ? playable : botDeck);
+      const raw = computeDamage(botCard, botDebuffs, botCombo, botAttackBonus); const cost = CARD_COST[botCard.id] ?? 2;
+      const blocked = Math.min(playerShield, raw); const dealt = Math.max(0, raw - blocked); const lesion = LESION_BY_CARD[botCard.id];
+      setBotEnergy((e) => clamp(e - cost + 2, 0, 6)); setPlayerEnergy((e) => clamp(e + 2, 0, 6));
+      setPlayerShield((s) => Math.max(0, s - blocked)); setBotDebuffs((d) => tickDebuffs(d)); setPlayerDebuffs((d) => [...tickDebuffs(d), lesion]);
+      setBotAttackBonus(0);
+      setPlayerHp((hp) => { const next = Math.max(0, hp - dealt); if (next <= 0) { setTurn("end"); setLog("Derrota! O bot ganhou essa rodada."); } else { setTurn("player"); setRound((r) => r + 1); } return next; });
+      setBotCombo((c) => (dealt > 0 ? c + 1 : 0)); setPlayerCombo(0);
+      const msg = `Round ${round}: bot usou ${botCard.attack} (custo ${cost}) e causou ${dealt}.`; setLog(msg); pushHistory(`${msg} Debuff: ${lesion.label}.`);
+      playWrong();
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [turn, round, botInventory, botHp, botEnergy, botDeck, botDebuffs, botCombo, botAttackBonus, playerShield]);
 
   const handlePlayerAttack = () => {
     if (turn !== "player" || !selectedCard) return;
+    const cost = CARD_COST[selectedCard.id] ?? 2;
+    if (playerEnergy < cost) { setLog(`Energia insuficiente para ${selectedCard.attack}.`); return; }
     playClick();
-    const damageRaw = computeDamage(selectedCard, playerDebuffs);
-    const blocked = Math.min(botShield, damageRaw);
-    const damage = Math.max(0, damageRaw - blocked);
-    const nextBotHp = Math.max(0, botHp - damage);
-    const lesion = LESION_BY_CARD[selectedCard.id];
-    setBotShield((v) => Math.max(0, v - blocked));
-    setBotHp(nextBotHp);
-    setPlayerDebuffs((d) => tickDebuffs(d));
-    setBotDebuffs((d) => [...tickDebuffs(d), lesion]);
-    const playerMsg = `Round ${round}: ${selectedCard.attack} (${selectedCard.name}) causou ${damage}${blocked ? ` (${blocked} bloqueado)` : ""} e aplicou ${lesion.label}.`;
-    setLog(playerMsg);
-    pushHistory(playerMsg);
-    playCorrect();
-
-    if (nextBotHp <= 0) {
-      setTurn("end");
-      setLog("Vitória! Você venceu a batalha de cartas.");
-      playVictory();
-      return;
-    }
-
-    setTurn("bot");
-    window.setTimeout(() => {
-      const useItem = Math.random() < 0.3;
-      if (useItem) {
-        const item = pickRandom(ITEM_CARDS);
-        if (item.heal) setBotHp((hp) => Math.min(100, hp + item.heal));
-        if (item.shield) setBotShield((s) => s + item.shield);
-        if (item.cleanse) setBotDebuffs([]);
-        const itemMsg = `Round ${round}: bot usou item ${item.name} (${item.blurb}).`;
-        setLog(itemMsg);
-        pushHistory(itemMsg);
-        setTurn("player");
-        setRound((r) => r + 1);
-        playWrong();
-        return;
-      }
-      const botCard = pickRandom(botDeck);
-      const rawBotDamage = computeDamage(botCard, botDebuffs);
-      const blocked = Math.min(playerShield, rawBotDamage);
-      const botDamage = Math.max(0, rawBotDamage - blocked);
-      const lesion = LESION_BY_CARD[botCard.id];
-      setPlayerShield((v) => Math.max(0, v - blocked));
-      setBotDebuffs((d) => tickDebuffs(d));
-      setPlayerDebuffs((d) => [...tickDebuffs(d), lesion]);
-      setPlayerHp((hp) => {
-        const nextPlayerHp = Math.max(0, hp - botDamage);
-        const botMsg = `Round ${round}: bot usou ${botCard.attack} (${botCard.name}) e causou ${botDamage}${blocked ? ` (${blocked} bloqueado)` : ""}. Debuff: ${lesion.label}.`;
-        setLog(botMsg);
-        pushHistory(botMsg);
-        if (nextPlayerHp <= 0) {
-          setTurn("end");
-          setLog("Derrota! O bot ganhou essa rodada.");
-          pushHistory("Derrota! O bot zerou seu HP.");
-        } else {
-          setTurn("player");
-          setRound((r) => r + 1);
-        }
-        return nextPlayerHp;
-      });
-      playWrong();
-    }, 700);
-  };
-
-  const handleUseItem = () => {
-    if (turn !== "player" || turn === "end") return;
-    playClick();
-    const item = pickRandom(ITEM_CARDS);
-    if (item.heal) setPlayerHp((hp) => Math.min(100, hp + item.heal));
-    if (item.shield) setPlayerShield((s) => s + item.shield);
-    if (item.cleanse) setPlayerDebuffs([]);
-    setPlayerDebuffs((d) => tickDebuffs(d));
-    const msg = `Round ${round}: você usou item ${item.name} (${item.blurb}).`;
-    setLog(msg);
-    pushHistory(msg);
+    const raw = computeDamage(selectedCard, playerDebuffs, playerCombo, attackBonus);
+    const blocked = Math.min(botShield, raw); const dealt = Math.max(0, raw - blocked); const nextBotHp = Math.max(0, botHp - dealt); const lesion = LESION_BY_CARD[selectedCard.id];
+    setPlayerEnergy((e) => clamp(e - cost, 0, 6)); setBotEnergy((e) => clamp(e + 2, 0, 6));
+    setBotShield((s) => Math.max(0, s - blocked)); setBotHp(nextBotHp); setAttackBonus(0);
+    setPlayerDebuffs((d) => tickDebuffs(d)); setBotDebuffs((d) => [...tickDebuffs(d), lesion]);
+    setPlayerCombo((c) => (dealt > 0 ? c + 1 : 0)); setBotCombo(0);
+    const msg = `Round ${round}: ${selectedCard.attack} (custo ${cost}) causou ${dealt}.`; setLog(msg); pushHistory(`${msg} Debuff: ${lesion.label}.`); playCorrect();
+    if (nextBotHp <= 0) { setTurn("end"); setLog("Vitória! Você venceu a batalha de cartas."); playVictory(); return; }
     setTurn("bot");
   };
 
-  const restart = () => {
-    playClick();
-    setPlayerHp(100);
-    setBotHp(100);
-    setTurn("player");
-    setLog("Escolha uma carta e veja o efeito neurofuncional antes de atacar.");
-    setSelectedCardId(null);
-    setRound(1);
-    setHistory([]);
-    setPlayerDebuffs([]);
-    setBotDebuffs([]);
-    setPlayerShield(0);
-    setBotShield(0);
+  const handleUseItem = (itemId: string) => {
+    if (turn !== "player") return;
+    const item = playerInventory.find((i) => i.id === itemId); if (!item) return;
+    playClick(); applyItem(item, "player"); setPlayerInventory((inv) => inv.filter((i) => i !== item));
+    const msg = `Round ${round}: você usou ${item.name}.`; setLog(msg); pushHistory(`${msg} ${item.blurb}`);
+    setPlayerDebuffs((d) => tickDebuffs(d)); setBotDebuffs((d) => tickDebuffs(d));
+    setPlayerEnergy((e) => clamp(e + 1, 0, 6)); setBotEnergy((e) => clamp(e + 2, 0, 6));
+    setTurn("bot");
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl">
-        <div className="flex items-center justify-between mb-5">
-          <button
-            onClick={() => {
-              playClick();
-              navigate("/mini-games");
-            }}
-            className="flex items-center gap-2 text-white/50 hover:text-white text-sm"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Mini-jogos
-          </button>
-          <div className="flex items-center gap-2 text-xs uppercase tracking-widest font-semibold text-amber-300">
-            <Swords className="w-4 h-4" />
-            Card Battle
-          </div>
-        </div>
+  const restart = () => window.location.reload();
 
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="rounded-xl p-3" style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)" }}>
-            <p className="text-xs text-emerald-300/80 uppercase tracking-widest mb-1">Você</p>
-            <p className="text-2xl font-black text-emerald-300">{playerHp} HP</p>
-          </div>
-          <div className="rounded-xl p-3 text-right" style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)" }}>
-            <p className="text-xs text-rose-300/80 uppercase tracking-widest mb-1">Bot</p>
-            <p className="text-2xl font-black text-rose-300">{botHp} HP</p>
-          </div>
-        </div>
+  return <div className="min-h-screen p-4 md:p-6"><div className="mx-auto w-full max-w-5xl space-y-4">
+    <div className="flex items-center justify-between"><button onClick={() => (playClick(), navigate('/mini-games'))} className="flex items-center gap-2 text-white/60 hover:text-white text-sm"><ArrowLeft className="w-4 h-4"/>Mini-jogos</button><div className="flex items-center gap-2 text-amber-300 text-xs uppercase tracking-widest font-semibold"><Swords className="w-4 h-4"/>Card Battle · Round {round}</div></div>
+    <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]"><section className="rounded-2xl border border-white/10 bg-slate-900/45 p-4 space-y-4">
+      <div className="grid grid-cols-2 gap-3"><StatCard title="Você" hp={playerHp} shield={playerShield} energy={playerEnergy} combo={playerCombo} tone="emerald"/><StatCard title="Bot" hp={botHp} shield={botShield} energy={botEnergy} combo={botCombo} tone="rose" right/></div>
+      <p className="rounded-xl border border-cyan-300/20 bg-cyan-500/5 p-3 text-sm text-white/80">{log}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">{hand.map((card)=>{const cost=CARD_COST[card.id]??2; const locked=playerEnergy<cost; return <button key={card.id} onClick={()=>turn==='player'&&setSelectedCardId(card.id)} disabled={turn!=='player'||turn==='end'} className="rounded-xl p-3 text-left transition-all disabled:opacity-50" style={{background:`linear-gradient(140deg, ${card.color}25, rgba(15,23,42,0.7))`,border:`1px solid ${selectedCardId===card.id?'#f8fafc':`${card.color}80`}`}}><div className="mb-1 flex items-center justify-between"><p className="font-bold text-white">{card.name}</p><span className="text-xs font-semibold" style={{color:card.color}}>⚡{cost}</span></div><p className="text-sm font-semibold" style={{color:card.color}}>{card.attack}</p><p className="text-xs text-white/70">{locked?'Energia insuficiente.':card.blurb}</p></button>})}</div>
+      <div className="flex gap-2"><button onClick={handlePlayerAttack} disabled={turn!=="player"||!selectedCard||turn==="end"} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40" style={{ background: "linear-gradient(135deg, #7c6ff7, #22d3ee)" }}>Atacar</button><button onClick={restart} className="py-2.5 px-4 rounded-xl text-sm font-semibold flex items-center gap-2" style={{ background: "rgba(124,111,247,0.15)", border: "1px solid rgba(124,111,247,0.35)", color: "#a89cf7" }}><RotateCcw className="w-4 h-4"/>Reiniciar</button></div>
+      <div><p className="text-xs uppercase tracking-widest text-cyan-200/70 mb-2">Seus itens (escolha manual)</p><div className="grid grid-cols-1 md:grid-cols-3 gap-2">{playerInventory.length?playerInventory.map((item)=><button key={item.id} onClick={()=>handleUseItem(item.id)} disabled={turn!=="player"} className="rounded-lg border border-cyan-300/30 bg-cyan-500/10 p-2 text-left text-xs text-cyan-100 disabled:opacity-40"><div className="flex items-center gap-1 font-semibold"><Pill className="w-3.5 h-3.5"/>{item.name}</div><p className="text-white/70">{item.blurb}</p></button>):<p className="text-xs text-white/50">Sem itens restantes.</p>}</div></div>
+    </section><aside className="rounded-2xl border border-white/10 bg-slate-900/35 p-4"><p className="text-xs uppercase tracking-widest text-white/40 mb-2">Status</p><p className="text-sm text-white/75 mb-2">{turn==="player"?"Sua vez":turn==="bot"?"Bot pensando...":"Partida encerrada"}</p><p className="text-xs text-white/70 mb-1">Debuffs você: {playerDebuffs.length?playerDebuffs.map((d)=>`${d.label}(${d.turns})`).join(', '):'nenhum'}</p><p className="text-xs text-white/70 mb-3">Debuffs bot: {botDebuffs.length?botDebuffs.map((d)=>`${d.label}(${d.turns})`).join(', '):'nenhum'}</p>{history.length>0&&<div className="space-y-1.5 border-t border-white/10 pt-3">{history.map((h,i)=><p key={i} className="text-xs text-white/65">• {h}</p>)}</div>}</aside></div>
+  </div></div>;
+}
 
-        <div className="rounded-xl p-3 mb-4 text-sm text-white/80" style={{ background: "rgba(240,239,245,0.04)", border: "1px solid rgba(240,239,245,0.1)" }}>
-          {log}
-        </div>
-
-        <div
-          className="rounded-xl p-3 mb-4 text-xs text-white/75 flex items-start gap-2"
-          style={{ background: "rgba(124,111,247,0.08)", border: "1px solid rgba(124,111,247,0.2)" }}
-        >
-          <Info className="w-4 h-4 mt-0.5 text-violet-300 flex-shrink-0" />
-          <p>
-            Regras: cada turno você escolhe 1 carta e ataca. O bot responde com uma carta aleatória.
-            Agora lesões geram debuffs temáticos (afasia, ataxia, negligência) e itens clínicos podem curar ou proteger.
-          </p>
-        </div>
-        <div className="rounded-xl p-3 mb-4 text-xs" style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)" }}>
-          <p className="text-emerald-300 font-semibold mb-2">Guia rápido de debuffs</p>
-          <ul className="space-y-1 text-white/75">
-            <li><b>Afasia Satírica:</b> 20% de chance do ataque falhar.</li>
-            <li><b>Ataxia:</b> dano fica instável (variação extra).</li>
-            <li><b>Negligência/Escotoma:</b> 15% de chance de errar o alvo.</li>
-            <li><b>Síndrome Disexecutiva:</b> -4 de dano por turno.</li>
-          </ul>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {hand.map((card) => (
-            <button
-              key={card.id}
-              type="button"
-              onClick={() => {
-                if (turn !== "player") return;
-                playClick();
-                setSelectedCardId(card.id);
-              }}
-              disabled={turn !== "player" || turn === "end"}
-              className="rounded-xl p-3 text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
-              style={{
-                background: `rgba(${parseInt(card.color.slice(1, 3), 16)},${parseInt(card.color.slice(3, 5), 16)},${parseInt(card.color.slice(5, 7), 16)},0.11)`,
-                border: `1px solid ${selectedCardId === card.id ? "#f0eff5" : card.color}`,
-                boxShadow: selectedCardId === card.id ? "0 0 0 2px rgba(240,239,245,0.15)" : "none",
-              }}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-bold text-white">{card.name}</p>
-                <span className="text-xs font-semibold flex items-center gap-1" style={{ color: card.color }}>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  {card.power}
-                </span>
-              </div>
-              <p className="text-sm font-medium mb-1" style={{ color: card.color }}>{card.attack}</p>
-              <p className="text-xs text-white/70">{ATTACK_FLAVOR[card.id] ?? card.blurb}</p>
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-4 flex gap-2">
-          <button
-            onClick={handlePlayerAttack}
-            disabled={turn !== "player" || !selectedCard || turn === "end"}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: "linear-gradient(135deg, #7c6ff7, #22d3ee)" }}
-          >
-            {selectedCard ? `Atacar com ${selectedCard.attack}` : "Selecione uma carta"}
-          </button>
-          <button
-            onClick={handleUseItem}
-            disabled={turn !== "player" || turn === "end"}
-            className="py-2.5 px-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: "rgba(34,211,238,0.15)", border: "1px solid rgba(34,211,238,0.35)", color: "#67e8f9" }}
-          >
-            <Pill className="w-4 h-4" />
-            Usar item
-          </button>
-          <button
-            onClick={restart}
-            className="py-2.5 px-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
-            style={{ background: "rgba(124,111,247,0.15)", border: "1px solid rgba(124,111,247,0.35)", color: "#a89cf7" }}
-          >
-            <RotateCcw className="w-4 h-4" />
-            Reiniciar
-          </button>
-          <div
-            className="px-4 rounded-xl text-xs flex items-center gap-2"
-            style={{ border: "1px solid rgba(240,239,245,0.12)", color: "rgba(240,239,245,0.5)" }}
-          >
-            <Shield className="w-3.5 h-3.5" />
-            {turn === "player" ? `Sua vez · Round ${round}` : turn === "bot" ? "Vez do bot" : "Partida encerrada"} · Escudo {playerShield}/{botShield}
-          </div>
-        </div>
-        <div className="mt-3 text-xs text-white/60">
-          Seus debuffs: {playerDebuffs.length ? playerDebuffs.map((d) => `${d.label}(${d.turns})`).join(", ") : "nenhum"}.
-        </div>
-
-        {history.length > 0 && (
-          <div
-            className="mt-3 rounded-xl p-3"
-            style={{ background: "rgba(240,239,245,0.03)", border: "1px solid rgba(240,239,245,0.09)" }}
-          >
-            <p className="text-[11px] uppercase tracking-widest text-white/35 mb-2">Histórico</p>
-            <div className="space-y-1.5">
-              {history.map((item, i) => (
-                <p key={`${item}-${i}`} className="text-xs text-white/65">
-                  {item}
-                </p>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+function StatCard({ title, hp, shield, energy, combo, tone, right = false }: { title: string; hp: number; shield: number; energy: number; combo: number; tone: "emerald" | "rose"; right?: boolean }) {
+  const colors = tone === "emerald" ? "text-emerald-300 border-emerald-400/25 bg-emerald-500/10" : "text-rose-300 border-rose-400/25 bg-rose-500/10";
+  return <div className={`rounded-xl border p-3 ${colors} ${right ? "text-right" : ""}`}><p className="text-[11px] uppercase tracking-widest opacity-80">{title}</p><p className="text-2xl font-black leading-none mt-1">{hp} HP</p><p className="mt-2 text-xs flex items-center gap-1 opacity-80"><Shield className="w-3.5 h-3.5"/>Escudo: {shield}</p><p className="text-xs flex items-center gap-1 opacity-90"><Zap className="w-3.5 h-3.5"/>Energia: {energy}/6 · Combo: {combo}</p></div>;
 }
