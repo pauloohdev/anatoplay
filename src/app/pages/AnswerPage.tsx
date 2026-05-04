@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
-import { Lightbulb, Pause, Play, Home } from "lucide-react";
+import { Lightbulb, Pause, Play, Home, Brain } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useGame } from "../context/GameContext";
 import { questions } from "../data/questions";
@@ -14,12 +14,11 @@ const TEXT_3     = "rgba(240,239,245,0.30)";
 
 export default function AnswerPage() {
   const navigate = useNavigate();
-  const { state } = useGame();
-  const { currentQuestionIndex, isCorrect } = state;
+  const { state, pauseGame, resumeGame } = useGame();
+  const { currentQuestionIndex, isCorrect, isPaused, isHost } = state;
   const question = questions[currentQuestionIndex];
 
   const [resultFlash, setResultFlash] = useState<string | null>(null);
-  const [isPaused, setIsPaused] = useState(false);
   const resultSoundKey = useRef<string | null>(null);
 
   useEffect(() => {
@@ -65,8 +64,9 @@ export default function AnswerPage() {
         <div className="ans-item flex justify-end mb-4">
           <button
             type="button"
-            onClick={() => setIsPaused((v) => !v)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
+            onClick={() => (isPaused ? resumeGame() : pauseGame())}
+            disabled={!isHost}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: "rgba(124,111,247,0.12)",
               border: "1px solid rgba(124,111,247,0.3)",
@@ -74,8 +74,13 @@ export default function AnswerPage() {
             }}
           >
             {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-            {isPaused ? "Retomar" : "Pause"}
+            {isPaused ? "Retomar" : "Pausar"}
           </button>
+          {!isHost && (
+            <span className="ml-2 text-xs" style={{ color: TEXT_3 }}>
+              Apenas o host pode pausar
+            </span>
+          )}
         </div>
 
         <div
@@ -137,7 +142,7 @@ export default function AnswerPage() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setIsPaused(false)}
+                onClick={resumeGame}
                 className="py-2.5 rounded-xl text-sm font-semibold"
                 style={{ background: "rgba(124,111,247,0.15)", border: "1px solid rgba(124,111,247,0.25)", color: "#a89cf7" }}
               >
