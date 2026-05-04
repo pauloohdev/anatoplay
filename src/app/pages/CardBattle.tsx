@@ -49,7 +49,7 @@ export default function CardBattle() {
   const [playerHp, setPlayerHp] = useState(100);
   const [botHp, setBotHp] = useState(100);
   const [turn, setTurn] = useState<"player" | "bot" | "end">("player");
-  const [log, setLog] = useState<string>("Selecione uma carta e clique em Atacar.");
+  const [log, setLog] = useState<string>("Escolha uma carta e veja o efeito neurofuncional antes de atacar.");
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [round, setRound] = useState(1);
   const [history, setHistory] = useState<string[]>([]);
@@ -152,7 +152,7 @@ export default function CardBattle() {
     setPlayerHp(100);
     setBotHp(100);
     setTurn("player");
-    setLog("Selecione uma carta e clique em Atacar.");
+    setLog("Escolha uma carta e veja o efeito neurofuncional antes de atacar.");
     setSelectedCardId(null);
     setRound(1);
     setHistory([]);
@@ -198,7 +198,7 @@ export default function CardBattle() {
         </div>
 
         <div
-          className="rounded-xl p-3 mb-4 text-xs text-white/65 flex items-start gap-2"
+          className="rounded-xl p-3 mb-4 text-xs text-white/75 flex items-start gap-2"
           style={{ background: "rgba(124,111,247,0.08)", border: "1px solid rgba(124,111,247,0.2)" }}
         >
           <Info className="w-4 h-4 mt-0.5 text-violet-300 flex-shrink-0" />
@@ -207,8 +207,17 @@ export default function CardBattle() {
             Agora lesões geram debuffs temáticos (afasia, ataxia, negligência) e itens clínicos podem curar ou proteger.
           </p>
         </div>
+        <div className="rounded-xl p-3 mb-4 text-xs" style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)" }}>
+          <p className="text-emerald-300 font-semibold mb-2">Guia rápido de debuffs</p>
+          <ul className="space-y-1 text-white/75">
+            <li><b>Afasia Satírica:</b> 20% de chance do ataque falhar.</li>
+            <li><b>Ataxia:</b> dano fica instável (variação extra).</li>
+            <li><b>Negligência/Escotoma:</b> 15% de chance de errar o alvo.</li>
+            <li><b>Síndrome Disexecutiva:</b> -4 de dano por turno.</li>
+          </ul>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {hand.map((card) => (
             <button
               key={card.id}
@@ -219,7 +228,7 @@ export default function CardBattle() {
                 setSelectedCardId(card.id);
               }}
               disabled={turn !== "player" || turn === "end"}
-              className="rounded-xl p-4 text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
+              className="rounded-xl p-3 text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
               style={{
                 background: `rgba(${parseInt(card.color.slice(1, 3), 16)},${parseInt(card.color.slice(3, 5), 16)},${parseInt(card.color.slice(5, 7), 16)},0.11)`,
                 border: `1px solid ${selectedCardId === card.id ? "#f0eff5" : card.color}`,
@@ -234,7 +243,7 @@ export default function CardBattle() {
                 </span>
               </div>
               <p className="text-sm font-medium mb-1" style={{ color: card.color }}>{card.attack}</p>
-              <p className="text-xs text-white/60">{card.blurb}</p>
+              <p className="text-xs text-white/70">{ATTACK_FLAVOR[card.id] ?? card.blurb}</p>
             </button>
           ))}
         </div>
