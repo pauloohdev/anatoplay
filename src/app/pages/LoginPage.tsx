@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
 import gsap from "gsap";
-import { Brain, Users, ArrowRight, Hash, Layers, ChevronRight, Settings2, ClipboardCheck } from "lucide-react";
+import { Brain, Users, ArrowRight, Hash, Layers, ChevronRight, Settings2, ClipboardCheck, BookOpenCheck, Swords, Gamepad2 } from "lucide-react";
 import { useGame } from "../context/GameContext";
 import { playClick } from "../../lib/gameAudio";
 
@@ -269,7 +269,49 @@ export default function LoginPage() {
             <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 transition-transform group-hover:translate-x-0.5"
               style={{ color: TEXT_3 }} />
           </button>
+
+          <button onClick={() => { playClick(); navigate("/mini-games/flashcards"); }}
+            className="group flex items-center gap-3 p-4 rounded-xl text-left transition-all duration-200 hover:scale-[1.01]"
+            style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.2)" }}>
+              <BookOpenCheck className="w-4 h-4 text-cyan-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: TEXT_1 }}>Flashcards</p>
+              <p className="text-xs mt-0.5" style={{ color: TEXT_3 }}>ordem aleatória · revisão</p>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 transition-transform group-hover:translate-x-0.5"
+              style={{ color: TEXT_3 }} />
+          </button>
+
+          <button onClick={() => { playClick(); navigate("/mini-games/card-battle"); }}
+            className="group flex items-center gap-3 p-4 rounded-xl text-left transition-all duration-200 hover:scale-[1.01]"
+            style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)" }}>
+              <Swords className="w-4 h-4 text-amber-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: TEXT_1 }}>Card Battle</p>
+              <p className="text-xs mt-0.5" style={{ color: TEXT_3 }}>duelo simples vs bot</p>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 transition-transform group-hover:translate-x-0.5"
+              style={{ color: TEXT_3 }} />
+          </button>
         </div>
+
+        <button
+          onClick={() => {
+            playClick();
+            navigate("/mini-games");
+          }}
+          className="reveal-item mt-3 w-full p-3.5 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold"
+          style={{ background: "rgba(124,111,247,0.12)", border: "1px solid rgba(124,111,247,0.26)", color: "#a89cf7" }}
+        >
+          <Gamepad2 className="w-4 h-4" />
+          Ver todos os mini-jogos
+        </button>
 
 
       </div>

@@ -10,6 +10,8 @@ import MiniGameHub from "./pages/MiniGameHub";
 import IdentifyStructure from "./pages/IdentifyStructure";
 import WordMatch from "./pages/WordMatch";
 import CriteriaPage from "./pages/CriteriaPage";
+import FlashcardsReview from "./pages/FlashcardsReview";
+import CardBattle from "./pages/CardBattle";
 
 export const router = createBrowserRouter([
   {
@@ -25,6 +27,8 @@ export const router = createBrowserRouter([
       { path: "mini-games", Component: MiniGameHub },
       { path: "mini-games/identify", Component: IdentifyStructure },
       { path: "mini-games/match", Component: WordMatch },
+      { path: "mini-games/flashcards", Component: FlashcardsReview },
+      { path: "mini-games/card-battle", Component: CardBattle },
       { path: "criterios", Component: CriteriaPage },
     ],
   },

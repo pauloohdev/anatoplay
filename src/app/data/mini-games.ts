@@ -237,3 +237,107 @@ export const MATCH_PAIRS_SET_B: MatchPair[] = [
     color: "#a78bfa",
   },
 ];
+
+// ─── Flashcards de Revisão ────────────────────────────────────────────────────
+
+export interface FlashcardItem {
+  id: string;
+  front: string;
+  back: string;
+  tag: "pre-estudo" | "revisao";
+}
+
+export const FLASHCARDS: FlashcardItem[] = [
+  {
+    id: "fc-1",
+    front: "Qual estrutura é responsável pela memória episódica e espacial?",
+    back: "Hipocampo — ele participa da consolidação da memória de longo prazo e navegação espacial.",
+    tag: "pre-estudo",
+  },
+  {
+    id: "fc-2",
+    front: "Qual área cortical está ligada ao planejamento e controle inibitório?",
+    back: "Córtex pré-frontal (lobo frontal).",
+    tag: "pre-estudo",
+  },
+  {
+    id: "fc-3",
+    front: "O que o tálamo faz de principal?",
+    back: "Atua como estação de retransmissão sensorial para o córtex.",
+    tag: "revisao",
+  },
+  {
+    id: "fc-4",
+    front: "Qual região é central para a compreensão da linguagem?",
+    back: "Área de Wernicke, no lobo temporal dominante.",
+    tag: "revisao",
+  },
+  {
+    id: "fc-5",
+    front: "Qual estrutura ajusta precisão e coordenação dos movimentos?",
+    back: "Cerebelo — essencial para coordenação, equilíbrio e aprendizado motor.",
+    tag: "revisao",
+  },
+];
+
+// ─── Cartas de Batalha ────────────────────────────────────────────────────────
+
+export interface BattleCard {
+  id: string;
+  name: string;
+  attack: string;
+  power: number;
+  blurb: string;
+  color: string;
+}
+
+export const BATTLE_CARDS: BattleCard[] = [
+  {
+    id: "bc-frontal",
+    name: "Lobo Frontal",
+    attack: "Comando Executivo",
+    power: 18,
+    blurb: "Planejamento e decisão sob pressão.",
+    color: "#7c6ff7",
+  },
+  {
+    id: "bc-temporal",
+    name: "Lobo Temporal",
+    attack: "Eco de Memórias",
+    power: 16,
+    blurb: "Integra linguagem e memória declarativa.",
+    color: "#f43f5e",
+  },
+  {
+    id: "bc-cerebelo",
+    name: "Cerebelo",
+    attack: "Sincronia Motora",
+    power: 14,
+    blurb: "Ajustes finos para precisão total.",
+    color: "#10b981",
+  },
+  {
+    id: "bc-brainstem",
+    name: "Tronco Encefálico",
+    attack: "Pulso Vital",
+    power: 20,
+    blurb: "Resiliência máxima das funções vitais.",
+    color: "#94a3b8",
+  },
+  {
+    id: "bc-parietal",
+    name: "Lobo Parietal",
+    attack: "Mapa Sensorial",
+    power: 15,
+    blurb: "Converte sensação em vantagem tática.",
+    color: "#8b5cf6",
+  },
+  {
+    id: "bc-occipital",
+    name: "Lobo Occipital",
+    attack: "Foco Visual",
+    power: 17,
+    blurb: "Leitura rápida do campo de batalha.",
+    color: "#f59e0b",
+  },
+];

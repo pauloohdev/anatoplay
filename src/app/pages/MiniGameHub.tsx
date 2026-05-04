@@ -1,7 +1,7 @@
 import { useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
 import gsap from "gsap";
-import { Brain, Layers, ArrowLeft, Target, ChevronRight } from "lucide-react";
+import { Brain, Layers, ArrowLeft, Target, ChevronRight, BookOpenCheck, Swords } from "lucide-react";
 import { playClick } from "../../lib/gameAudio";
 
 interface MiniGameCardProps {
@@ -230,6 +230,38 @@ export default function MiniGameHub() {
               { label: "Penalidade", value: "-30" },
             ]}
             onClick={() => navigate("/mini-games/match")}
+          />
+
+          <MiniGameCard
+            index={2}
+            title="Flashcards de Revisão"
+            subtitle="Complementar"
+            description="Modo de pré-estudo e revisão rápida. Vire cartões com perguntas e respostas curtas para fixar os conceitos."
+            icon={<BookOpenCheck className="w-6 h-6 text-cyan-300" />}
+            accentColor="#22d3ee"
+            glowColor="rgba(34,211,238,0.25)"
+            stats={[
+              { label: "Modos", value: "2" },
+              { label: "Formato", value: "Q/A" },
+              { label: "Ritmo", value: "Livre" },
+            ]}
+            onClick={() => navigate("/mini-games/flashcards")}
+          />
+
+          <MiniGameCard
+            index={3}
+            title="Card Battle"
+            subtitle="Mini-jogo 03"
+            description="Batalha de cartas simples contra bot: escolha ataques por turno e reduza o HP rival até zerar."
+            icon={<Swords className="w-6 h-6 text-amber-300" />}
+            accentColor="#f59e0b"
+            glowColor="rgba(245,158,11,0.25)"
+            stats={[
+              { label: "Modo", value: "vs Bot" },
+              { label: "HP", value: "100" },
+              { label: "Turnos", value: "1v1" },
+            ]}
+            onClick={() => navigate("/mini-games/card-battle")}
           />
         </div>
 
