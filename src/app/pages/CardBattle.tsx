@@ -9,7 +9,7 @@ function pickRandom<T>(arr: T[]): T {
 }
 
 type DebuffKey = "aphasia" | "ataxia" | "neglect" | "brainFog";
-type Debuff = { key: DebuffKey; label: string; turns: number; effect: string };
+type Debuff = { key: DebuffKey; label: string; turns: number; };
 type ItemCard = { id: string; name: string; blurb: string; heal?: number; shield?: number; cleanse?: boolean; };
 
 const ITEM_CARDS: ItemCard[] = [
@@ -19,21 +19,12 @@ const ITEM_CARDS: ItemCard[] = [
 ];
 
 const LESION_BY_CARD: Record<string, Debuff> = {
-  "bc-frontal": { key: "brainFog", label: "Síndrome Disexecutiva", turns: 2, effect: "-4 dano por turno" },
-  "bc-temporal": { key: "aphasia", label: "Afasia Satírica", turns: 2, effect: "20% de falha no ataque" },
-  "bc-cerebelo": { key: "ataxia", label: "Ataxia", turns: 2, effect: "dano muito instável (±3 extra)" },
-  "bc-brainstem": { key: "brainFog", label: "Pane de Tronco", turns: 1, effect: "-4 dano no próximo turno" },
-  "bc-parietal": { key: "neglect", label: "Negligência Hemiespacial", turns: 2, effect: "15% de errar o alvo" },
-  "bc-occipital": { key: "neglect", label: "Escotoma Dramático", turns: 2, effect: "15% de errar o alvo" },
-};
-
-const ATTACK_FLAVOR: Record<string, string> = {
-  "bc-frontal": "Sabotagem de função executiva: confunde planejamento e reduz eficiência.",
-  "bc-temporal": "Ruído de linguagem e memória: embaralha compreensão e resposta.",
-  "bc-cerebelo": "Choque proprioceptivo: coordenação cai e o dano vira loteria.",
-  "bc-brainstem": "Pressão autonômica: queda brusca de performance no próximo turno.",
-  "bc-parietal": "Distorção espacial: alvo perde noção do lado atingido.",
-  "bc-occipital": "Interferência visual: campo visual parcial e mais ataques perdidos.",
+  "bc-frontal": { key: "brainFog", label: "Síndrome Disexecutiva", turns: 2 },
+  "bc-temporal": { key: "aphasia", label: "Afasia Satírica", turns: 2 },
+  "bc-cerebelo": { key: "ataxia", label: "Ataxia", turns: 2 },
+  "bc-brainstem": { key: "brainFog", label: "Pane de Tronco", turns: 1 },
+  "bc-parietal": { key: "neglect", label: "Negligência Hemiespacial", turns: 2 },
+  "bc-occipital": { key: "neglect", label: "Escotoma Dramático", turns: 2 },
 };
 
 function tickDebuffs(debuffs: Debuff[]) {
@@ -87,7 +78,7 @@ export default function CardBattle() {
     setBotHp(nextBotHp);
     setPlayerDebuffs((d) => tickDebuffs(d));
     setBotDebuffs((d) => [...tickDebuffs(d), lesion]);
-    const playerMsg = `Round ${round}: ${selectedCard.attack} (${selectedCard.name}) causou ${damage}${blocked ? ` (${blocked} bloqueado)` : ""}. Debuff aplicado: ${lesion.label} (${lesion.effect}).`;
+    const playerMsg = `Round ${round}: ${selectedCard.attack} (${selectedCard.name}) causou ${damage}${blocked ? ` (${blocked} bloqueado)` : ""} e aplicou ${lesion.label}.`;
     setLog(playerMsg);
     pushHistory(playerMsg);
     playCorrect();
@@ -125,7 +116,7 @@ export default function CardBattle() {
       setPlayerDebuffs((d) => [...tickDebuffs(d), lesion]);
       setPlayerHp((hp) => {
         const nextPlayerHp = Math.max(0, hp - botDamage);
-        const botMsg = `Round ${round}: bot usou ${botCard.attack} (${botCard.name}) e causou ${botDamage}${blocked ? ` (${blocked} bloqueado)` : ""}. Debuff em você: ${lesion.label} (${lesion.effect}).`;
+        const botMsg = `Round ${round}: bot usou ${botCard.attack} (${botCard.name}) e causou ${botDamage}${blocked ? ` (${blocked} bloqueado)` : ""}. Debuff: ${lesion.label}.`;
         setLog(botMsg);
         pushHistory(botMsg);
         if (nextPlayerHp <= 0) {
@@ -212,8 +203,8 @@ export default function CardBattle() {
         >
           <Info className="w-4 h-4 mt-0.5 text-violet-300 flex-shrink-0" />
           <p>
-            Regras refinadas: cartas causam dano + debuff com efeito real. Debuffs duram turnos e alteram seu ataque.
-            Itens clínicos servem para curar, limpar status e criar escudo.
+            Regras: cada turno você escolhe 1 carta e ataca. O bot responde com uma carta aleatória.
+            Agora lesões geram debuffs temáticos (afasia, ataxia, negligência) e itens clínicos podem curar ou proteger.
           </p>
         </div>
         <div className="rounded-xl p-3 mb-4 text-xs" style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)" }}>
@@ -291,8 +282,8 @@ export default function CardBattle() {
             {turn === "player" ? `Sua vez · Round ${round}` : turn === "bot" ? "Vez do bot" : "Partida encerrada"} · Escudo {playerShield}/{botShield}
           </div>
         </div>
-        <div className="mt-3 text-xs text-white/70 rounded-xl p-2.5" style={{ background: "rgba(240,239,245,0.04)", border: "1px solid rgba(240,239,245,0.1)" }}>
-          Seus debuffs: {playerDebuffs.length ? playerDebuffs.map((d) => `${d.label} (${d.effect}, ${d.turns}t)`).join(" · ") : "nenhum"}.
+        <div className="mt-3 text-xs text-white/60">
+          Seus debuffs: {playerDebuffs.length ? playerDebuffs.map((d) => `${d.label}(${d.turns})`).join(", ") : "nenhum"}.
         </div>
 
         {history.length > 0 && (
