@@ -416,8 +416,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           dispatch({ type: "SET_STATUS", payload: "answer" });
 
           // Host: after answer reveal delay → broadcast rankings
-          if (s.isHost && !s.isPaused) {
-            scheduleRankingTransition();
+          if (s.isHost) {
+            hostTimerRef.current = setTimeout(() => {
+              const players = Array.from(playerScoresRef.current.values()).sort(
+                (a, b) => b.score - a.score
+              );
+              broadcast({ type: "SHOW_RANKING", players });
+            }, ANSWER_REVEAL_DURATION_MS);
           }
           break;
         }
